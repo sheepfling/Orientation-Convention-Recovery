@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "attitude-convention-inference"
+version = "0.4.0"
+description = "Infer unknown Euler, quaternion, and angular-rate conventions from trajectory consistency."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ninja Rick" }]
+keywords = [
+  "attitude",
+  "euler-angles",
+  "quaternion",
+  "rotations",
+  "trajectory",
+  "angular-velocity",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
+]
+dependencies = [
+  "numpy>=1.26.4",
+  "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.9",
+  "pyright>=1.1.390",
+]
+publish = [
+  "build>=1.2",
+  "twine>=6.0",
+]
+
+[project.scripts]
+attitude-conventions = "attitude_convention_inference.cli:main"
+attitude-convention-inference = "attitude_convention_inference.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+attitude_convention_inference = ["py.typed"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+include = ["src", "tests", "examples"]
+reportMissingTypeStubs = "none"
