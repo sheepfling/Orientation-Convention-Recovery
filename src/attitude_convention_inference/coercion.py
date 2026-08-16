@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, TypeAlias
 
 from .models import (
     ConventionConstraints,
@@ -27,11 +27,11 @@ __all__ = [
     "merge_priors",
 ]
 
-type ConfigInput = InferenceConfig | Mapping[str, Any] | None
-type ConstraintInput = ConventionConstraints | Mapping[str, Any] | None
-type PriorInput = ConventionPriors | Mapping[str, Any] | None
-type DomainPriorInput = DomainPrior | Mapping[str, Any] | None
-type PreferenceProfileInput = PreferenceProfile | Mapping[str, Any] | None
+ConfigInput: TypeAlias = InferenceConfig | Mapping[str, Any] | None
+ConstraintInput: TypeAlias = ConventionConstraints | Mapping[str, Any] | None
+PriorInput: TypeAlias = ConventionPriors | Mapping[str, Any] | None
+DomainPriorInput: TypeAlias = DomainPrior | Mapping[str, Any] | None
+PreferenceProfileInput: TypeAlias = PreferenceProfile | Mapping[str, Any] | None
 
 
 def coerce_config(value: ConfigInput) -> InferenceConfig:
@@ -121,5 +121,4 @@ def merge_priors(base: ConventionPriors, override: ConventionPriors) -> Conventi
     ####
     return ConventionPriors.model_validate(payload)
 ####
-
 

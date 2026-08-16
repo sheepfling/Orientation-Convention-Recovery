@@ -7,7 +7,7 @@ name = "attitude-convention-inference"
 dynamic = ["version"]
 description = "Infer unknown Euler, quaternion, and angular-rate conventions from trajectory consistency."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Ninja Rick" }]
@@ -26,6 +26,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
     "Typing :: Typed",
@@ -75,7 +76,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
@@ -87,6 +88,8 @@ respect-gitignore = true
 line-length = 100
 
 [tool.pyright]
+# Analyze against the stable NumPy typing surface; runtime compatibility is tested
+# separately on every supported interpreter in the CI matrix.
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 include = ["src", "tests", "examples"]

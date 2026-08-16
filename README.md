@@ -596,4 +596,4 @@ excitation, too-short trajectories, Euler branch crossings, scalar-first/last
 variants, and cohort packet failures. The seed is fixed by default so results can be
 compared across changes.
 
-Python 3.12 or newer is required.
+Python 3.11 or newer is required.

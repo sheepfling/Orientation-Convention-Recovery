@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import field, fields, replace
 from enum import Enum, StrEnum
 from math import isfinite, pi
-from typing import Any, Literal, Self, cast
+from typing import Any, Literal, Self, TypeVar, cast
 
 from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass
@@ -70,6 +70,8 @@ _CONSTRAINT_FIELDS: tuple[str, ...] = (
     "rate_sign",
 )
 _PRIOR_FIELDS: tuple[str, ...] = _CONSTRAINT_FIELDS
+T = TypeVar("T")
+EnumT = TypeVar("EnumT", bound=Enum)
 
 
 class AttitudeRepresentation(StrEnum):
@@ -228,7 +230,7 @@ class FrozenModel:
 
 
 
-def _as_tuple[T](value: T | Sequence[T] | set[T] | None) -> tuple[T, ...] | None:
+def _as_tuple(value: T | Sequence[T] | set[T] | None) -> tuple[T, ...] | None:
     if value is None:
         return None
     ####
@@ -244,14 +246,14 @@ def _as_tuple[T](value: T | Sequence[T] | set[T] | None) -> tuple[T, ...] | None
 
 
 
-def _enum_value[EnumT: Enum](enum_type: type[EnumT], value: EnumT | str) -> EnumT:
+def _enum_value(enum_type: type[EnumT], value: EnumT | str) -> EnumT:
     return value if isinstance(value, enum_type) else enum_type(value)
 ####
 
 
 
 
-def _enum_tuple[EnumT: Enum](
+def _enum_tuple(
     enum_type: type[EnumT],
     value: EnumT | str | Sequence[EnumT | str],
 ) -> tuple[EnumT, ...]:
@@ -458,7 +460,7 @@ class ConventionConstraints(FrozenModel):
 
 
     @staticmethod
-    def _intersect_values[T](
+    def _intersect_values(
         base: tuple[T, ...],
         constrained: tuple[T, ...] | None,
         dimension: str,
@@ -580,7 +582,7 @@ def _prior_mapping(
 
 
 
-def _validated_payload[T](cls: type[T], value: T | Mapping[str, Any]) -> dict[str, Any]:
+def _validated_payload(cls: type[T], value: T | Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(value, cls):
         instance = cast(Any, value)
         return {item.name: getattr(instance, item.name) for item in fields(instance)}
@@ -1278,5 +1280,4 @@ class InferenceReport(FrozenModel):
     preference_profile_supported_class_ids: tuple[str, ...] = ()
     representative_selection_reason: str = "canonical-policy"
 ####
-
 
