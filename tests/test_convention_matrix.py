@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from itertools import product
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -28,6 +29,33 @@ from attitude_convention_inference.synthetic import (
 
 def _time(sample_count: int = 81, dt: float = 0.025) -> np.ndarray:
     return np.arange(sample_count, dtype=np.float64) * dt
+####
+
+
+
+
+def _from_quat(quaternions: np.ndarray, *, scalar_first: bool = False) -> Rotation:
+    return cast(
+        Rotation,
+        cast(Any, Rotation).from_quat(quaternions, scalar_first=scalar_first),
+    )
+####
+
+
+
+
+def _from_rotvec(rotvecs: np.ndarray) -> Rotation:
+    return cast(Rotation, cast(Any, Rotation).from_rotvec(rotvecs))
+####
+
+
+
+
+def _quaternions(rotation: Rotation, *, scalar_first: bool = False) -> np.ndarray:
+    return np.asarray(cast(Any, rotation).as_quat(scalar_first=scalar_first), dtype=np.float64)
+####
+
+
 
 
 QUATERNION_CASES = tuple(
@@ -77,6 +105,9 @@ def test_quaternion_convention_matrix(
     assert best.rate_frame is rate_frame
     assert best.rate_order == rate_order
     assert report.best.interval_rmse_rad < 1.0e-6
+####
+
+
 
 
 EULER_CASES = tuple(product(("xyz", "zxy", "zyx"), tuple(EulerMode), tuple(AttitudeDirection)))
@@ -118,6 +149,9 @@ def test_euler_convention_matrix_with_rate_axes_anchored(
     assert best.euler_mode is euler_mode
     assert best.attitude_direction is direction
     assert report.best.interval_rmse_rad < 1.0e-6
+####
+
+
 
 
 def test_trimmed_multiscale_score_tolerates_sparse_attitude_outliers() -> None:
@@ -130,13 +164,19 @@ def test_trimmed_multiscale_score_tolerates_sparse_attitude_outliers() -> None:
         rate_order="qpr",
     )
     clean = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s), truth)
-    raw = Rotation.from_quat(clean.orientation, scalar_first=True)
-    quaternions = raw.as_quat()
+    if clean.orientation is None or clean.rates is None or clean.time_s is None:
+        raise AssertionError("synthetic trajectory must contain all streams")
+    ####
+    raw = _from_quat(clean.orientation, scalar_first=True)
+    quaternions = _quaternions(raw)
     for index, error in zip((37, 101), ([0.08, -0.03, 0.05], [-0.06, 0.04, 0.02]), strict=True):
-        quaternions[index] = (Rotation.from_rotvec(error) * raw[index]).as_quat()
+        quaternions[index] = _quaternions(
+            _from_rotvec(np.asarray(error, dtype=np.float64)) * raw[index]
+        )
+    ####
     contaminated = TrajectoryData(
         representation=clean.representation,
-        orientation=Rotation.from_quat(quaternions).as_quat(scalar_first=True),
+        orientation=_quaternions(_from_quat(quaternions), scalar_first=True),
         rates=clean.rates,
         time_s=clean.time_s,
     )
@@ -157,6 +197,9 @@ def test_trimmed_multiscale_score_tolerates_sparse_attitude_outliers() -> None:
     assert best.attitude_direction is truth.attitude_direction
     assert best.rate_frame is truth.rate_frame
     assert best.rate_order == truth.rate_order
+####
+
+
 
 
 def test_rate_unit_and_missing_time_are_reported_as_unidentifiable_when_both_free() -> None:
@@ -170,6 +213,9 @@ def test_rate_unit_and_missing_time_are_reported_as_unidentifiable_when_both_fre
         rate_unit=RateUnit.RADIANS_PER_SECOND,
     )
     timed = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s), truth)
+    if truth.quaternion_order is None:
+        raise AssertionError("truth must define a quaternion order")
+    ####
     untimed = TrajectoryData(
         representation=timed.representation,
         orientation=timed.orientation,
@@ -196,3 +242,6 @@ def test_rate_unit_and_missing_time_are_reported_as_unidentifiable_when_both_fre
     )
     assert periods[0] < periods[1]
     assert report.diagnostics.confidence < 0.50
+####
+
+

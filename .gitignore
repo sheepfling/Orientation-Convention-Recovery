@@ -7,5 +7,11 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+src/attitude_convention_inference/_version.py
 coverage.xml
 htmlcov/
+.codex_pydeps/
+.pytest-tmp/
+schemas/
+*.pdf
+.idea/

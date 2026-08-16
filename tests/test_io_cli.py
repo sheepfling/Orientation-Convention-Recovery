@@ -27,6 +27,10 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+    ####
+####
+
+
 
 
 def test_load_csv_quaternion(tmp_path: Path) -> None:
@@ -46,10 +50,16 @@ def test_load_csv_quaternion(tmp_path: Path) -> None:
         ("a", "b", "c"),
         "t",
     )
+    if data.orientation is None or data.rates is None:
+        raise AssertionError("CSV loader should return attitudes and rates")
+    ####
     assert data.orientation.shape == (3, 4)
     assert data.rates.shape == (3, 3)
     assert data.time_s is not None
     np.testing.assert_allclose(data.time_s, [0.0, 0.1, 0.2])
+####
+
+
 
 
 def test_load_csv_rejects_missing_columns(tmp_path: Path) -> None:
@@ -62,6 +72,10 @@ def test_load_csv_rejects_missing_columns(tmp_path: Path) -> None:
             ("q0", "q1", "q2", "q3"),
             ("a", "b", "c"),
         )
+    ####
+####
+
+
 
 
 def test_load_csv_rejects_wrong_orientation_width(tmp_path: Path) -> None:
@@ -74,6 +88,10 @@ def test_load_csv_rejects_wrong_orientation_width(tmp_path: Path) -> None:
             ("x", "y", "z"),
             ("a", "b", "c"),
         )
+    ####
+####
+
+
 
 
 def test_load_csv_reports_invalid_numeric_line(tmp_path: Path) -> None:
@@ -89,6 +107,10 @@ def test_load_csv_reports_invalid_numeric_line(tmp_path: Path) -> None:
             ("q0", "q1", "q2", "q3"),
             ("a", "b", "c"),
         )
+    ####
+####
+
+
 
 
 def test_load_config_round_trip(tmp_path: Path) -> None:
@@ -103,6 +125,9 @@ def test_load_config_round_trip(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
     path.write_text(expected.model_dump_json(indent=2), encoding="utf-8")
     assert load_config(path) == expected
+####
+
+
 
 
 def test_write_interval_diagnostics(tmp_path: Path) -> None:
@@ -117,6 +142,9 @@ def test_write_interval_diagnostics(tmp_path: Path) -> None:
     rows = list(csv.DictReader(target.open(encoding="utf-8")))
     assert len(rows) == 2
     assert rows[1]["near_alias"] == "True"
+####
+
+
 
 
 def test_cli_writes_report_and_details(tmp_path: Path) -> None:
@@ -136,6 +164,7 @@ def test_cli_writes_report_and_details(tmp_path: Path) -> None:
                 "r": 1.0,
             }
         )
+    ####
     _write_csv(source, rows)
     config = InferenceConfig(
         search_space=SearchSpace(
@@ -181,3 +210,21 @@ def test_cli_writes_report_and_details(tmp_path: Path) -> None:
     assert payload["sample_count"] == 21
     assert payload["best"]["interval_rmse_rad"] < 1.0e-6
     assert len(list(csv.DictReader(details_path.open(encoding="utf-8")))) == 20
+####
+
+
+
+
+def test_cli_lists_and_inspects_packaged_profiles(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--list-profiles"]) == 0
+    listing = capsys.readouterr().out
+    assert "neutral-v1" in listing
+    assert "common-engineering-v1" in listing
+
+    assert main(["--inspect-profile", "common-engineering-v1", "--format", "json"]) == 0
+    inspected = json.loads(capsys.readouterr().out)
+    assert inspected["profile_id"] == "common-engineering-v1"
+    assert inspected["representative_preferences"]["quaternion_order"]["scalar_last"] == 2.0
+####
+
+

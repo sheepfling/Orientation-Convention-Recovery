@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-import numpy as np
+from numpy import arange
 
 from attitude_convention_inference import (
     AttitudeDirection,
@@ -20,7 +20,7 @@ from attitude_convention_inference.synthetic import (
 
 
 def main() -> None:
-    time_s = np.arange(0.0, 4.0, 0.025)
+    time_s = arange(0.0, 4.0, 0.025)
     rates = rich_three_axis_rates(time_s)
     convention = SyntheticConvention(
         representation=AttitudeRepresentation.QUATERNION,
@@ -30,6 +30,9 @@ def main() -> None:
         rate_order="rqp",
     )
     data = encode_synthetic_trajectory(time_s, rates, convention)
+    if data.orientation is None or data.rates is None or data.time_s is None:
+        raise AssertionError("synthetic trajectory must contain all streams")
+    ####
     report = infer_conventions(data)
 
     print(report.best.hypothesis.model_dump_json(indent=2))
@@ -37,7 +40,7 @@ def main() -> None:
 
     output = Path(__file__).with_name("synthetic_quaternion.csv")
     with output.open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.writer(stream)
+        writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(("time", "q0", "q1", "q2", "q3", "w0", "w1", "w2"))
         for index in range(data.sample_count):
             writer.writerow(
@@ -47,10 +50,12 @@ def main() -> None:
                     *data.rates[index],
                 )
             )
+        ####
+    ####
     print(f"Wrote {output}")
-
-
 ####
+
+
 
 
 if __name__ == "__main__":

@@ -1,15 +1,14 @@
 # Changelog
 
-## 0.4.0
+## 0.0.1
 
-- Removed Pydantic from the runtime dependency set.
-- Replaced configuration and report models with frozen, slotted dataclasses.
-- Retained lightweight `model_validate`, `model_dump`, `model_dump_json`, and `model_copy` compatibility helpers.
+- Added Pydantic back as a runtime dependency for dataclass validation and JSON Schema generation.
+- Kept the configuration and report models as frozen, slotted Pydantic dataclasses.
 - Made `infer_conventions` the canonical public API for both array-like inputs and `TrajectoryData`.
 - Routed the CSV API and command-line application through the same canonical function.
 - Kept `infer_attitude_conventions` and the full-name executable as compatibility aliases.
 - Made `attitude-conventions` the canonical console command.
-- Reduced runtime dependencies to NumPy and SciPy.
+- Kept runtime dependencies limited to NumPy, Pydantic, and SciPy.
 - Expanded the regression suite to 68 tests.
 
 ## 0.3.0

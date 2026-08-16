@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "packet_id": "C",
+  "quotient_space_id": "orientation-qspace-v1",
+  "class_ids": [
+    "C1",
+    "C2",
+    "C3"
+  ],
+  "log_evidence": {
+    "C1": 0.0,
+    "C2": -0.3364722366212129,
+    "C3": -0.5596157879354225
+  },
+  "local_prior": {
+    "C1": 0.3333333333333333,
+    "C2": 0.3333333333333333,
+    "C3": 0.3333333333333333
+  },
+  "contender_set": [
+    "C2",
+    "C1",
+    "C3"
+  ],
+  "evidence_semantics": "calibrated-likelihood",
+  "calibration": {
+    "calibration_id": "orientation-risk-temp-v1",
+    "validated": true,
+    "validation_domain": "synthetic-reference",
+    "temperature": 1.0,
+    "effective_sample_definition": "independent validation blocks"
+  },
+  "lineage": {
+    "atomic_source_ids": [
+      "source-C"
+    ],
+    "parent_packet_ids": [],
+    "dependency_group_ids": [],
+    "sensor_ids": [],
+    "time_start_ns": null,
+    "time_end_ns": null
+  },
+  "provenance": {
+    "domain": "example",
+    "artifact_role": "trajectory"
+  },
+  "hard_anchors": [],
+  "excitation_rank": 3,
+  "excitation_eigenvalues": [],
+  "local_result_reason": null,
+  "warnings": []
+}

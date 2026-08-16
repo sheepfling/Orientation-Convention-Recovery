@@ -1,3 +1,5 @@
+"""Public package surface for attitude convention inference."""
+
 from .api import (
     infer_attitude_conventions,
     infer_conventions,
@@ -5,7 +7,22 @@ from .api import (
     inspect_csv,
     resolve_config,
 )
-from .core import TrajectoryData
+from .core import TrajectoryData, should_prune_by_exact_lower_bound
+from .fusion import (
+    CalibrationDescriptor,
+    CohortFusionResult,
+    EvidencePacket,
+    EvidenceSemantics,
+    FusionStatus,
+    LineageDescriptor,
+    LogOddsExplanation,
+    build_shared_prototype,
+    coalesce_evidence_packets,
+    fuse_target_with_robust_borrowing,
+    load_evidence_packet,
+    relative_log_evidence_from_posterior,
+    write_fusion_result,
+)
 from .inference import best_interval_diagnostics, generate_hypotheses
 from .io import CsvLayout, detect_csv_layout, load_csv_trajectory, read_csv_columns
 from .models import (
@@ -19,22 +36,38 @@ from .models import (
     ConventionPriors,
     DimensionAssessment,
     DimensionStatus,
+    DomainPrior,
     EulerMode,
+    HeuristicFeatures,
     HypothesisSpaceSummary,
     InferenceConfig,
     InferenceReport,
+    PreferenceProfile,
     QuaternionOrder,
     RateFrame,
     RateUnit,
+    ResultLabel,
+    ScaleRisk,
     SearchSpace,
+    WrapUnitStatus,
+)
+from .profiles import (
+    DEFAULT_PROFILE_ID,
+    WeightedPreferenceProfile,
+    available_preference_profiles,
+    compose_preference_profiles,
+    load_preference_profile,
 )
 from .version import __version__
 
 __all__ = [
+    "DEFAULT_PROFILE_ID",
     "AngleUnit",
     "AttitudeDirection",
     "AttitudeRepresentation",
+    "CalibrationDescriptor",
     "CandidateResult",
+    "CohortFusionResult",
     "ConfidenceLabel",
     "ConventionConstraints",
     "ConventionHypothesis",
@@ -42,26 +75,46 @@ __all__ = [
     "CsvLayout",
     "DimensionAssessment",
     "DimensionStatus",
+    "DomainPrior",
     "EulerMode",
+    "EvidencePacket",
+    "EvidenceSemantics",
+    "FusionStatus",
+    "HeuristicFeatures",
     "HypothesisSpaceSummary",
     "InferenceConfig",
     "InferenceReport",
+    "LineageDescriptor",
+    "LogOddsExplanation",
+    "PreferenceProfile",
     "QuaternionOrder",
     "RateFrame",
     "RateUnit",
+    "ResultLabel",
+    "ScaleRisk",
     "SearchSpace",
     "TrajectoryData",
+    "WeightedPreferenceProfile",
+    "WrapUnitStatus",
     "__version__",
+    "available_preference_profiles",
     "best_interval_diagnostics",
+    "build_shared_prototype",
+    "coalesce_evidence_packets",
+    "compose_preference_profiles",
     "detect_csv_layout",
+    "fuse_target_with_robust_borrowing",
     "generate_hypotheses",
     "infer_attitude_conventions",
     "infer_conventions",
     "infer_csv",
     "inspect_csv",
     "load_csv_trajectory",
+    "load_evidence_packet",
+    "load_preference_profile",
     "read_csv_columns",
+    "relative_log_evidence_from_posterior",
     "resolve_config",
+    "should_prune_by_exact_lower_bound",
+    "write_fusion_result",
 ]
-
-####

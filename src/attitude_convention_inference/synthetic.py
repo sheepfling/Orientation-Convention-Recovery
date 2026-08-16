@@ -1,12 +1,34 @@
+"""Synthetic trajectory generation for examples and contract tests."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, cast
 
-import numpy as np
+from numpy import (
+    all as np_all,
+)
+from numpy import (
+    arange,
+    asarray,
+    column_stack,
+    cos,
+    diff,
+    float64,
+    int64,
+    newaxis,
+    rad2deg,
+    sin,
+    stack,
+    where,
+)
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
 from .core import FloatArray, TrajectoryData, integrate_interval_increments
+from .math_utils import rotation_from_euler as _rotation_from_euler
+from .math_utils import rotation_from_quat as _rotation_from_quat
+from .math_utils import rotation_quaternions as _rotation_quaternions
 from .models import (
     AngleUnit,
     AttitudeDirection,
@@ -15,7 +37,15 @@ from .models import (
     QuaternionOrder,
     RateFrame,
     RateUnit,
+    angle_unit_scale,
 )
+
+__all__ = [
+    "SyntheticConvention",
+    "encode_synthetic_trajectory",
+    "integrate_attitude_trajectory",
+    "rich_three_axis_rates",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,9 +59,9 @@ class SyntheticConvention:
     euler_order: str | None = None
     euler_mode: EulerMode | None = None
     angle_unit: AngleUnit | None = None
-
-
 ####
+
+
 
 
 def integrate_attitude_trajectory(
@@ -41,30 +71,36 @@ def integrate_attitude_trajectory(
     initial_attitude: Rotation | None = None,
     integration_substeps: int = 32,
 ) -> Rotation:
-    times = np.asarray(time_s, dtype=np.float64)
-    rates = np.asarray(angular_rates_rad_s, dtype=np.float64)
+    times = asarray(time_s, dtype=float64)
+    rates = asarray(angular_rates_rad_s, dtype=float64)
     if times.ndim != 1 or rates.shape != (times.size, 3):
         raise ValueError("time_s must be (N,) and angular_rates_rad_s must be (N, 3).")
-    if not np.all(np.diff(times) > 0.0):
+    ####
+    if not np_all(diff(times) > 0.0):
         raise ValueError("time_s must be strictly increasing.")
+    ####
 
-    increments, _, _ = integrate_interval_increments(
+    integrated = integrate_interval_increments(
         rates,
-        np.diff(times),
+        diff(times),
         rate_frame,
         integration_substeps,
     )
-    current = initial_attitude or Rotation.from_euler("xyz", [0.31, -0.22, 0.47])
-    quaternions: list[NDArray[np.float64]] = [
-        np.asarray(current.as_quat(), dtype=np.float64)
-    ]
+    increments = integrated.predicted_increments
+    current = (
+        initial_attitude
+        if initial_attitude is not None
+        else _rotation_from_euler("xyz", asarray([0.31, -0.22, 0.47], dtype=float64))
+    )
+    quaternions: list[NDArray[float64]] = [_rotation_quaternions(current)]
     for increment in increments:
         current = current * increment if rate_frame is RateFrame.BODY else increment * current
-        quaternions.append(np.asarray(current.as_quat(), dtype=np.float64))
-    return Rotation.from_quat(np.stack(quaternions))
-
-
+        quaternions.append(_rotation_quaternions(current))
+    ####
+    return _rotation_from_quat(stack(quaternions))
 ####
+
+
 
 
 def encode_synthetic_trajectory(
@@ -89,53 +125,64 @@ def encode_synthetic_trajectory(
     if convention.representation is AttitudeRepresentation.QUATERNION:
         if convention.quaternion_order is None:
             raise ValueError("Quaternion synthetic data require quaternion_order.")
-        orientation = raw_attitudes.as_quat(
-            scalar_first=convention.quaternion_order is QuaternionOrder.SCALAR_FIRST
+        ####
+        orientation: FloatArray = asarray(
+            cast(Any, raw_attitudes).as_quat(
+                scalar_first=convention.quaternion_order is QuaternionOrder.SCALAR_FIRST
+            ),
+            dtype=float64,
         )
         if quaternion_sign_flips:
-            signs = np.where(np.arange(orientation.shape[0]) % 2 == 0, 1.0, -1.0)
-            orientation = orientation * signs[:, np.newaxis]
+            indices: NDArray[int64] = arange(orientation.shape[0], dtype=int64)
+            signs: FloatArray = where(indices % 2 == 0, 1.0, -1.0)
+            orientation = orientation * signs[:, newaxis]
+        ####
     else:
         if convention.euler_order is None or convention.euler_mode is None:
             raise ValueError("Euler synthetic data require euler_order and euler_mode.")
+        ####
         if convention.angle_unit is None:
             raise ValueError("Euler synthetic data require angle_unit.")
+        ####
         sequence = (
             convention.euler_order.upper()
             if convention.euler_mode is EulerMode.INTRINSIC
             else convention.euler_order.lower()
         )
-        orientation = raw_attitudes.as_euler(
-            sequence,
-            degrees=convention.angle_unit is AngleUnit.DEGREES,
+        orientation = asarray(
+            cast(Any, raw_attitudes).as_euler(sequence, degrees=False),
+            dtype=float64,
         )
+        orientation /= angle_unit_scale(convention.angle_unit)
+    ####
 
-    canonical_rates = np.asarray(angular_rates_rad_s, dtype=np.float64).copy()
+    canonical_rates = asarray(angular_rates_rad_s, dtype=float64).copy()
     if convention.rate_unit is RateUnit.DEGREES_PER_SECOND:
-        canonical_rates = np.rad2deg(canonical_rates)
+        canonical_rates = rad2deg(canonical_rates)
+    ####
     component = {"p": 0, "q": 1, "r": 2}
     raw_rates = canonical_rates[:, [component[name] for name in convention.rate_order]]
 
     return TrajectoryData(
         representation=convention.representation,
-        orientation=np.asarray(orientation, dtype=np.float64),
+        orientation=asarray(orientation, dtype=float64),
         rates=raw_rates,
-        time_s=np.asarray(time_s, dtype=np.float64),
+        time_s=asarray(time_s, dtype=float64),
     )
-
-
 ####
+
+
 
 
 def rich_three_axis_rates(time_s: FloatArray, scale: float = 1.0) -> FloatArray:
-    times = np.asarray(time_s, dtype=np.float64)
-    return scale * np.column_stack(
+    times = asarray(time_s, dtype=float64)
+    return scale * column_stack(
         (
-            0.72 * np.sin(0.83 * times) + 0.31 * np.cos(2.17 * times + 0.2),
-            0.67 * np.cos(1.11 * times + 0.4) + 0.26 * np.sin(2.63 * times),
-            0.61 * np.sin(1.47 * times + 0.8) + 0.29 * np.cos(0.53 * times),
+            0.72 * sin(0.83 * times) + 0.31 * cos(2.17 * times + 0.2),
+            0.67 * cos(1.11 * times + 0.4) + 0.26 * sin(2.63 * times),
+            0.61 * sin(1.47 * times + 0.8) + 0.29 * cos(0.53 * times),
         )
     )
-
-
 ####
+
+

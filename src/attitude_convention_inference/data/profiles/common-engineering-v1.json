@@ -1,0 +1,38 @@
+{
+  "profile_id": "common-engineering-v1",
+  "source": "package-curated-policy",
+  "context": {
+    "domain": "general-engineering",
+    "role": "orientation-trajectory",
+    "evidence_kind": "curated-policy",
+    "calibration": "relative-ranking-only"
+  },
+  "class_weights": {},
+  "representative_preferences": {
+    "attitude_direction": {
+      "body_to_world": 1.5
+    },
+    "quaternion_order": {
+      "scalar_last": 2.0
+    },
+    "euler_mode": {
+      "intrinsic": 1.25
+    },
+    "angle_unit": {
+      "radians": 2.0
+    },
+    "rate_frame": {
+      "body": 2.0
+    },
+    "rate_order": {
+      "pqr": 1.5
+    },
+    "rate_unit": {
+      "radians_per_second": 2.0
+    },
+    "rate_sign": {
+      "1": 1.25
+    }
+  },
+  "strength": 1.0
+}

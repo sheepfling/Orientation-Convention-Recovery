@@ -1,0 +1,52 @@
+{
+  "target_packet_id": "C",
+  "reference_packet_ids": [
+    "A",
+    "B"
+  ],
+  "quotient_space_id": "orientation-qspace-v1",
+  "class_ids": [
+    "C1",
+    "C2",
+    "C3"
+  ],
+  "model_name": "robust-sharedness-mixture",
+  "local_posterior": {
+    "C1": 0.43749999999999994,
+    "C2": 0.31249999999999994,
+    "C3": 0.25000000000000006
+  },
+  "prototype_posterior": {
+    "C1": 0.9773755656108597,
+    "C2": 0.01809954751131223,
+    "C3": 0.0045248868778280564
+  },
+  "borrowed_prior": {
+    "C1": 0.8485671191553544,
+    "C2": 0.08114630467571643,
+    "C3": 0.0702865761689291
+  },
+  "fused_posterior": {
+    "C1": 0.8963492352512746,
+    "C2": 0.06122541879096867,
+    "C3": 0.04242534595775674
+  },
+  "fused_contender_set": [
+    "C1"
+  ],
+  "prior_sharedness": 0.8,
+  "posterior_sharedness": 0.8390386016023307,
+  "probability_valid": true,
+  "status": "cohort-posterior",
+  "explanation": {
+    "winner_class": "C1",
+    "runner_up_class": "C2",
+    "local_log_odds": 0.3364722366212129,
+    "borrowed_prior_log_odds": 2.347295428888018,
+    "fused_log_odds": 2.683767665509231
+  },
+  "calibration_ids": [
+    "orientation-risk-temp-v1"
+  ],
+  "warnings": []
+}

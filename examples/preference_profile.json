@@ -1,0 +1,23 @@
+{
+  "preference_profile": {
+    "profile_id": "robotics-stack-v1",
+    "source": "replace-with-reviewed-policy-record",
+    "context": {
+      "domain": "robotics",
+      "role": "imu"
+    },
+    "class_weights": {},
+    "representative_preferences": {
+      "quaternion_order": {
+        "scalar_last": 2.0
+      },
+      "rate_frame": {
+        "body": 2.0
+      },
+      "rate_unit": {
+        "radians_per_second": 2.0
+      }
+    },
+    "strength": 1.0
+  }
+}

@@ -1,0 +1,371 @@
+{
+  "generated": "2026-08-14",
+  "semantics": {
+    "survey_scores_are": "documentation-support scores",
+    "survey_scores_are_not": [
+      "calibrated probabilities",
+      "market-share estimates",
+      "trajectory evidence"
+    ],
+    "precedence": [
+      "documented_schema_or_api",
+      "ecosystem_or_protocol",
+      "artifact_role",
+      "broad_domain",
+      "uninformative_fallback"
+    ],
+    "selection_flow": [
+      "trajectory_or_statistical_contender_set",
+      "hard_metadata",
+      "survey_domain_class_prior",
+      "within_class_representative_prior",
+      "canonical_policy_fallback"
+    ],
+    "default_profile_weight": 1.0,
+    "unspecified_fields": "remain unrestricted; never infer a mismatch"
+  },
+  "profiles": [
+    {
+      "id": "scipy_rotation",
+      "realm": "scientific_numeric",
+      "ecosystem": "SciPy",
+      "artifact_role": "numeric_rotation_array",
+      "quaternion": {
+        "order": "xyzw",
+        "action": "active",
+        "scalar_first_optional": true
+      },
+      "euler": {
+        "sequence": "explicit",
+        "intrinsic_extrinsic": "explicit_by_case",
+        "angle_unit_default": "rad"
+      },
+      "rate": null,
+      "citation_key": "scipyQuaternion"
+    },
+    {
+      "id": "eigen_quaternion_coefficients",
+      "realm": "scientific_numeric",
+      "ecosystem": "Eigen",
+      "artifact_role": "coefficient_array_or_mapped_memory",
+      "quaternion": {
+        "order": "xyzw",
+        "constructor_argument_order": "wxyz"
+      },
+      "euler": null,
+      "rate": null,
+      "citation_key": "eigenQuaternion"
+    },
+    {
+      "id": "matlab_eul2quat",
+      "realm": "scientific_numeric",
+      "ecosystem": "MATLAB",
+      "artifact_role": "numeric_quaternion_output",
+      "quaternion": {
+        "order": "wxyz"
+      },
+      "euler": {
+        "sequence_default": "ZYX_intrinsic",
+        "angle_unit_default": "rad"
+      },
+      "rate": null,
+      "citation_key": "matlabEul2Quat"
+    },
+    {
+      "id": "matlab_aerospace_angle2quat",
+      "realm": "aerospace",
+      "ecosystem": "MATLAB Aerospace Toolbox",
+      "artifact_role": "aerospace_attitude_conversion",
+      "quaternion": {
+        "order": "wxyz",
+        "action": "passive",
+        "handedness": "right"
+      },
+      "euler": {
+        "sequence_default": "ZYX_intrinsic",
+        "angle_unit_default": "rad",
+        "action": "passive"
+      },
+      "rate": null,
+      "citation_key": "matlabAeroAngle2Quat"
+    },
+    {
+      "id": "naif_spice",
+      "realm": "nasa_space",
+      "ecosystem": "JPL NAIF SPICE",
+      "artifact_role": "spice_attitude",
+      "quaternion": {
+        "order": "wxyz",
+        "style": "SPICE_Hamilton"
+      },
+      "euler": {
+        "sequence": "explicit",
+        "angle_unit_default": "rad",
+        "construction": "moving_axis"
+      },
+      "rate": null,
+      "citation_key": "naifQuaternion"
+    },
+    {
+      "id": "naif_spice_ck",
+      "realm": "nasa_space",
+      "ecosystem": "JPL NAIF SPICE",
+      "artifact_role": "ck_pointing_angular_velocity",
+      "quaternion": null,
+      "euler": null,
+      "rate": {
+        "unit": "rad/s",
+        "expression_frame": "base_reference",
+        "handedness": "right"
+      },
+      "citation_key": "naifCK"
+    },
+    {
+      "id": "nasa_pds_quaternion",
+      "realm": "nasa_space",
+      "ecosystem": "NASA PDS",
+      "artifact_role": "pds_quaternion_product",
+      "quaternion": {
+        "documented_types": {
+          "SPICE": "wxyz",
+          "Spacecraft_Telemetry": "xyzw"
+        }
+      },
+      "euler": null,
+      "rate": null,
+      "citation_key": "nasaPDSQuaternion"
+    },
+    {
+      "id": "ros_core_imu",
+      "realm": "robotics_autonomy",
+      "ecosystem": "ROS",
+      "artifact_role": "imu_telemetry",
+      "quaternion": {
+        "order": "xyzw",
+        "orientation_semantics": "sensor_frame_wrt_world"
+      },
+      "euler": {
+        "preferred_rpy": "XYZ_fixed",
+        "angle_unit_default": "rad"
+      },
+      "rate": {
+        "unit": "rad/s",
+        "expression_frame": "sensor_body",
+        "handedness": "right"
+      },
+      "citation_keys": [
+        "rosrep103",
+        "rosrep145",
+        "rosQuaternion"
+      ]
+    },
+    {
+      "id": "mavlink_px4_attitude",
+      "realm": "robotics_autonomy",
+      "ecosystem": "MAVLink/PX4",
+      "artifact_role": "flight_telemetry",
+      "quaternion": {
+        "order": "wxyz",
+        "style": "Hamilton"
+      },
+      "euler": {
+        "sequence_default": "ZYX_intrinsic",
+        "angle_unit_default": "rad"
+      },
+      "rate": {
+        "unit": "rad/s",
+        "expression_frame": "body_FRD"
+      },
+      "citation_keys": [
+        "mavlinkCommon",
+        "px4VehicleOdometry"
+      ]
+    },
+    {
+      "id": "unity_3d",
+      "realm": "game_engine",
+      "ecosystem": "Unity",
+      "artifact_role": "3d_transform_rigidbody",
+      "quaternion": {
+        "order": "xyzw"
+      },
+      "euler": {
+        "sequence_default": "ZXY_extrinsic",
+        "angle_unit_default": "deg"
+      },
+      "rate": {
+        "unit": "rad/s",
+        "expression_frame": null
+      },
+      "citation_keys": [
+        "unityQuaternion",
+        "unityEuler",
+        "unityAngularVelocity"
+      ]
+    },
+    {
+      "id": "unreal_engine",
+      "realm": "game_engine",
+      "ecosystem": "Unreal Engine",
+      "artifact_role": "3d_transform_physics",
+      "quaternion": {
+        "order": "xyzw"
+      },
+      "euler": {
+        "sequence_default": "ZYX_intrinsic",
+        "angle_unit_default": "deg",
+        "sign_conventions": "engine_specific"
+      },
+      "rate": {
+        "documented_units": [
+          "rad/s",
+          "deg/s"
+        ],
+        "explicit_world_rad_s_getter": true
+      },
+      "citation_keys": [
+        "unrealQuaternion",
+        "unrealRotator",
+        "unrealAngularVelocity",
+        "unrealAngularDegrees"
+      ]
+    },
+    {
+      "id": "godot_3d",
+      "realm": "game_engine",
+      "ecosystem": "Godot",
+      "artifact_role": "3d_transform_rigidbody",
+      "quaternion": {
+        "order": "xyzw",
+        "style": "Hamilton"
+      },
+      "euler": {
+        "sequence_default": "YXZ_intrinsic",
+        "angle_unit_default": "rad"
+      },
+      "rate": {
+        "unit": "rad/s",
+        "expression_frame": null
+      },
+      "citation_keys": [
+        "godotQuaternion",
+        "godotBasis",
+        "godotAngularVelocity"
+      ]
+    }
+  ],
+  "broad_scorecards": {
+    "scientific_numeric": {
+      "quaternion_order": {
+        "xyzw": {
+          "score": 67,
+          "support": 2,
+          "informative_profiles": 3
+        },
+        "wxyz": {
+          "score": 33,
+          "support": 1,
+          "informative_profiles": 3
+        }
+      },
+      "euler_angle_unit": {
+        "rad": {
+          "score": 100,
+          "support": 2,
+          "informative_profiles": 2
+        }
+      },
+      "euler_sequence_note": "ZYX is the only fixed default among surveyed scientific interfaces that provide a default; coverage 1/1, so treat as weak.",
+      "rate_frame": "uninformative"
+    },
+    "robotics_autonomy_ros_vs_mavlink_px4": {
+      "quaternion_order": {
+        "xyzw": {
+          "score": 50,
+          "support": 1,
+          "informative_profiles": 2
+        },
+        "wxyz": {
+          "score": 50,
+          "support": 1,
+          "informative_profiles": 2
+        }
+      },
+      "euler_angle_unit": {
+        "rad": {
+          "score": 100,
+          "support": 2,
+          "informative_profiles": 2
+        }
+      },
+      "euler_sequence_quotient": {
+        "ZYX_intrinsic__equiv__XYZ_extrinsic": {
+          "score": 100,
+          "support": 2,
+          "informative_profiles": 2
+        }
+      },
+      "rate": {
+        "rad_s_body_sensor": {
+          "score": 100,
+          "support": 2,
+          "informative_profiles": 2
+        }
+      }
+    },
+    "nasa_spacecraft_broad": {
+      "quaternion_order": "mixed_by_specification_no_broad_tie_breaker",
+      "euler": "SPICE_uses_radians_but_sequence_is_explicit_no_broad_sequence_default",
+      "rate": "no_broad_rate_frame_prior; use CK base/reference rad/s only when CK role is known"
+    },
+    "major_game_engines": {
+      "quaternion_order": {
+        "xyzw": {
+          "score": 100,
+          "support": 3,
+          "informative_profiles": 3
+        },
+        "wxyz": {
+          "score": 0,
+          "support": 0,
+          "informative_profiles": 3
+        }
+      },
+      "euler_angle_unit": {
+        "deg": {
+          "score": 67,
+          "support": 2,
+          "informative_profiles": 3
+        },
+        "rad": {
+          "score": 33,
+          "support": 1,
+          "informative_profiles": 3
+        }
+      },
+      "euler_sequence_quotient": {
+        "YXZ_intrinsic__equiv__ZXY_extrinsic": {
+          "score": 67,
+          "support": 2,
+          "informative_profiles": 3
+        },
+        "ZYX_intrinsic__equiv__XYZ_extrinsic": {
+          "score": 33,
+          "support": 1,
+          "informative_profiles": 3
+        }
+      },
+      "rate": "rad/s is documented by all three surveyed rigid-body APIs; Unreal also exposes deg/s; broad expression frame unresolved"
+    }
+  },
+  "engine_rules": {
+    "class_prior": "pi_survey(C|d,r) = sum_p rho_p(d,r)*1[C intersects H_p] / Z_p",
+    "tempered_prior": "pi_lambda(C|d,r) = (1-lambda)/|T_ev| + lambda*pi_survey(C|d,r)/sum_{G in T_ev} pi_survey(G|d,r)",
+    "representative_prior": "pi_rep(h|C,d,r) proportional to sum_p rho_p(d,r)*1[h in H_p]",
+    "abstain_when": [
+      "survey prior has no support inside evidence contender set",
+      "broad-domain support is tied or insufficient",
+      "required convention dimension is undocumented"
+    ]
+  }
+}

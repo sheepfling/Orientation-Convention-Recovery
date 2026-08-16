@@ -23,14 +23,29 @@ def test_rejects_nonincreasing_time() -> None:
             rates=np.zeros((3, 3)),
             time_s=np.array([0.0, 1.0, 1.0]),
         )
-
-
+    ####
 ####
+
+
 
 
 def test_rejects_invalid_rate_order() -> None:
     with pytest.raises(ValueError, match="p/q/r permutation"):
         SearchSpace(rate_orders=("xyz",))
+    ####
+####
+
+
+
+
+@pytest.mark.parametrize("order", ("xxy", "xyy", "xxxx", "xyw"))
+def test_rejects_invalid_euler_order(order: str) -> None:
+    with pytest.raises(ValueError, match="valid three-axis Euler sequence"):
+        SearchSpace(euler_orders=(order,))
+    ####
+####
+
+
 
 
 @pytest.mark.parametrize(
@@ -41,16 +56,42 @@ def test_rejects_invalid_rate_order() -> None:
         "residual_floor_rad",
         "near_alias_step_rad",
         "hard_alias_step_rad",
+        "evidence_log_likelihood_ratio_threshold",
     ],
 )
 def test_rejects_nonfinite_inference_configuration(field: str) -> None:
     with pytest.raises(ValueError):
         InferenceConfig.model_validate({field: math.nan})
+    ####
+####
+
+
 
 
 def test_rejects_nonfinite_sample_period_bounds() -> None:
     with pytest.raises(ValueError, match="finite"):
         InferenceConfig(inferred_sample_period_bounds_s=(1.0, math.inf))
+    ####
+####
+
+
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("evidence_log_likelihood_ratio_threshold", 0.0),
+        ("evidence_min_intervals", 0),
+        ("evidence_stability_windows", 0),
+    ],
+)
+def test_rejects_invalid_evidence_configuration(field: str, value: float | int) -> None:
+    with pytest.raises(ValueError):
+        InferenceConfig.model_validate({field: value})
+    ####
+####
+
+
 
 
 def test_model_validate_normalizes_external_config_values() -> None:
@@ -61,6 +102,6 @@ def test_model_validate_normalizes_external_config_values() -> None:
     assert isinstance(config.constraints, ConventionConstraints)
     assert config.constraints.rate_frame == (RateFrame.BODY,)
     assert config.constraints.rate_order == ("pqr",)
-
-
 ####
+
+

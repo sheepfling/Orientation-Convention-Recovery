@@ -1,3 +1,5 @@
+"""CSV layout detection and report/configuration serialization."""
+
 from __future__ import annotations
 
 import csv
@@ -7,10 +9,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+from numpy import asarray, float64
 
 from .core import TrajectoryData
 from .models import AttitudeRepresentation, InferenceConfig, InferenceReport
+
+__all__ = [
+    "CsvLayout",
+    "detect_csv_layout",
+    "load_config",
+    "load_csv_trajectory",
+    "read_csv_columns",
+    "write_interval_diagnostics",
+    "write_report",
+]
 
 _QUATERNION_COLUMN_GROUPS: tuple[tuple[str, str, str, str], ...] = (
     ("qw", "qx", "qy", "qz"),
@@ -53,16 +65,16 @@ class CsvLayout:
     rate_columns: tuple[str, str, str]
     time_column: str | None
     available_columns: tuple[str, ...]
-
-
 ####
+
+
 
 
 def _normalize_column_name(value: str) -> str:
     return value.strip().lower().replace("-", "_").replace(" ", "_")
-
-
 ####
+
+
 
 
 def read_csv_columns(path: str | Path) -> tuple[str, ...]:
@@ -73,16 +85,20 @@ def read_csv_columns(path: str | Path) -> tuple[str, ...]:
             header = next(reader)
         except StopIteration as error:
             raise ValueError("CSV input is empty.") from error
+        ####
+    ####
 
     columns = tuple(header)
     if not columns or any(not column.strip() for column in columns):
         raise ValueError("CSV input has an invalid or empty header column.")
+    ####
     if len(set(columns)) != len(columns):
         raise ValueError("CSV input contains duplicate header names.")
+    ####
     return columns
-
-
 ####
+
+
 
 
 def _normalized_lookup(columns: Sequence[str]) -> dict[str, str]:
@@ -94,11 +110,13 @@ def _normalized_lookup(columns: Sequence[str]) -> dict[str, str]:
                 "CSV columns become ambiguous after case/spacing normalization: "
                 f"{lookup[normalized]!r} and {column!r}."
             )
+        ####
         lookup[normalized] = column
+    ####
     return lookup
-
-
 ####
+
+
 
 
 def _resolve_explicit_columns(
@@ -113,13 +131,16 @@ def _resolve_explicit_columns(
         actual = lookup.get(normalized)
         if actual is None:
             raise ValueError(f"CSV input has no {label} column named {requested_name!r}.")
+        ####
         resolved.append(actual)
+    ####
     if len(set(resolved)) != len(resolved):
         raise ValueError(f"Explicit {label} columns may not contain duplicates.")
+    ####
     return tuple(resolved)
-
-
 ####
+
+
 
 
 def _matching_groups(
@@ -130,10 +151,12 @@ def _matching_groups(
     for group in groups:
         if all(name in lookup for name in group):
             matches.append(tuple(lookup[name] for name in group))
+        ####
+    ####
     return tuple(matches)
-
-
 ####
+
+
 
 
 def _select_single_group(
@@ -149,22 +172,27 @@ def _select_single_group(
             f"Could not detect {label} columns. Supply them explicitly. "
             f"Available columns: {available}"
         )
+    ####
 
     grouped_by_members: dict[frozenset[str], list[tuple[str, ...]]] = {}
     for candidate in unique:
         grouped_by_members.setdefault(frozenset(candidate), []).append(candidate)
+    ####
 
     collapsed: list[tuple[str, ...]] = []
     for member_set, candidates in grouped_by_members.items():
         if len(candidates) == 1:
             collapsed.append(candidates[0])
             continue
+        ####
         file_order = tuple(column for column in available_columns if column in member_set)
         exact_order = [candidate for candidate in candidates if candidate == file_order]
         if len(exact_order) == 1:
             collapsed.append(exact_order[0])
         else:
             collapsed.extend(candidates)
+        ####
+    ####
 
     if len(collapsed) > 1:
         rendered = "; ".join(", ".join(group) for group in collapsed)
@@ -172,10 +200,11 @@ def _select_single_group(
             f"Multiple plausible {label} column groups were found ({rendered}). "
             "Supply the intended columns explicitly."
         )
+    ####
     return collapsed[0]
-
-
 ####
+
+
 
 
 def detect_csv_layout(
@@ -206,6 +235,7 @@ def detect_csv_layout(
             raise ValueError(
                 "Orientation columns must contain three Euler or four quaternion values."
             )
+        ####
         inferred_representation = (
             AttitudeRepresentation.QUATERNION
             if len(explicit_orientation) == 4
@@ -216,7 +246,9 @@ def detect_csv_layout(
                 f"{representation.value} input is incompatible with "
                 f"{len(explicit_orientation)} orientation columns."
             )
+        ####
         representation = inferred_representation
+    ####
 
     if representation is None:
         quaternion_matches = _matching_groups(_QUATERNION_COLUMN_GROUPS, lookup)
@@ -230,11 +262,11 @@ def detect_csv_layout(
                 "Supply --representation or explicit orientation columns. "
                 f"Available columns: {available}"
             )
+        ####
         representation = (
-            AttitudeRepresentation.QUATERNION
-            if has_quaternion
-            else AttitudeRepresentation.EULER
+            AttitudeRepresentation.QUATERNION if has_quaternion else AttitudeRepresentation.EULER
         )
+    ####
 
     if explicit_orientation is None:
         groups: Sequence[Sequence[str]] = (
@@ -247,12 +279,12 @@ def detect_csv_layout(
             label=f"{representation.value} orientation",
             available_columns=available_columns,
         )
+    ####
 
     expected_width = 4 if representation is AttitudeRepresentation.QUATERNION else 3
     if len(explicit_orientation) != expected_width:
-        raise ValueError(
-            f"{representation.value} requires {expected_width} orientation columns."
-        )
+        raise ValueError(f"{representation.value} requires {expected_width} orientation columns.")
+    ####
 
     if rate_columns is None:
         resolved_rates = _select_single_group(
@@ -262,14 +294,17 @@ def detect_csv_layout(
         )
     else:
         resolved_rates = _resolve_explicit_columns(rate_columns, lookup, label="angular-rate")
+    ####
     if len(resolved_rates) != 3:
         raise ValueError("Exactly three angular-rate columns are required.")
+    ####
 
     resolved_time: str | None
     if time_column is not None:
         resolved_time = _resolve_explicit_columns((time_column,), lookup, label="time")[0]
     else:
         resolved_time = next((lookup[name] for name in _TIME_COLUMNS if name in lookup), None)
+    ####
 
     return CsvLayout(
         representation=representation,
@@ -278,9 +313,9 @@ def detect_csv_layout(
         time_column=resolved_time,
         available_columns=available_columns,
     )
-
-
 ####
+
+
 
 
 def load_csv_trajectory(
@@ -295,6 +330,7 @@ def load_csv_trajectory(
         raise ValueError(
             f"{representation} requires {expected_orientation_columns} orientation columns."
         )
+    ####
 
     orientation_rows: list[list[float]] = []
     rate_rows: list[list[float]] = []
@@ -305,12 +341,15 @@ def load_csv_trajectory(
         reader = csv.DictReader(stream)
         if reader.fieldnames is None:
             raise ValueError("CSV input has no header row.")
+        ####
         required = set(orientation_columns) | set(rate_columns)
         if time_column is not None:
             required.add(time_column)
+        ####
         missing = sorted(required - set(reader.fieldnames))
         if missing:
             raise ValueError(f"CSV input is missing columns: {', '.join(missing)}")
+        ####
 
         for line_number, row in enumerate(reader, start=2):
             try:
@@ -318,34 +357,39 @@ def load_csv_trajectory(
                 rate_rows.append([float(row[column]) for column in rate_columns])
                 if time_column is not None:
                     time_rows.append(float(row[time_column]))
+                ####
             except (TypeError, ValueError) as error:
                 raise ValueError(f"Invalid numeric value on CSV line {line_number}.") from error
+            ####
+        ####
+    ####
 
     return TrajectoryData(
         representation=representation,
-        orientation=np.asarray(orientation_rows, dtype=np.float64),
-        rates=np.asarray(rate_rows, dtype=np.float64),
-        time_s=None if time_column is None else np.asarray(time_rows, dtype=np.float64),
+        orientation=asarray(orientation_rows, dtype=float64),
+        rates=asarray(rate_rows, dtype=float64),
+        time_s=None if time_column is None else asarray(time_rows, dtype=float64),
     )
-
-
 ####
+
+
 
 
 def load_config(path: str | Path) -> InferenceConfig:
     with Path(path).open("r", encoding="utf-8") as stream:
         payload: Any = json.load(stream)
+    ####
     return InferenceConfig.model_validate(payload)
-
-
 ####
+
+
 
 
 def write_report(path: str | Path, report: InferenceReport) -> None:
     Path(path).write_text(report.model_dump_json(indent=2), encoding="utf-8")
-
-
 ####
+
+
 
 
 def write_interval_diagnostics(
@@ -354,11 +398,13 @@ def write_interval_diagnostics(
 ) -> None:
     if not rows:
         raise ValueError("No interval diagnostics are available to write.")
+    ####
     fieldnames = list(rows[0])
     with Path(path).open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-
-
+    ####
 ####
+
+

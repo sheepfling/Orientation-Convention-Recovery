@@ -1,7 +1,10 @@
 {
   "constraints": {
     "quaternion_order": "scalar_first",
-    "rate_order": ["pqr", "rqp"]
+    "rate_order": [
+      "pqr",
+      "rqp"
+    ]
   },
   "priors": {
     "attitude_direction": {
@@ -14,6 +17,11 @@
     }
   },
   "integration_substeps": 4,
-  "window_sizes": [1, 2, 4, 8],
+  "window_sizes": [
+    1,
+    2,
+    4,
+    8
+  ],
   "top_k": 20
 }

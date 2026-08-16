@@ -43,9 +43,11 @@ def _write_z_rotation_csv(path: Path, sample_count: int = 21) -> None:
                     "r": 1.0,
                 }
             )
-
-
+        ####
+    ####
 ####
+
+
 
 
 def test_high_level_api_accepts_lists_and_mapping_constraints() -> None:
@@ -57,6 +59,7 @@ def test_high_level_api_accepts_lists_and_mapping_constraints() -> None:
         orientation.append([0.0, 0.0, float(np.sin(angle / 2.0)), float(np.cos(angle / 2.0))])
         rates.append([0.0, 0.0, 1.0])
         time_s.append(0.01 * index)
+    ####
 
     report = infer_attitude_conventions(
         orientation,
@@ -75,9 +78,9 @@ def test_high_level_api_accepts_lists_and_mapping_constraints() -> None:
     assert report.best.hypothesis.quaternion_order is QuaternionOrder.SCALAR_LAST
     assert report.best.hypothesis.rate_frame is RateFrame.BODY
     assert report.best.interval_rmse_rad < 1.0e-10
-
-
 ####
+
+
 
 
 def test_detect_csv_layout_from_common_columns(tmp_path: Path) -> None:
@@ -90,9 +93,9 @@ def test_detect_csv_layout_from_common_columns(tmp_path: Path) -> None:
     assert layout.orientation_columns == ("qx", "qy", "qz", "qw")
     assert layout.rate_columns == ("p", "q", "r")
     assert layout.time_column == "time_s"
-
-
 ####
+
+
 
 
 def test_detect_csv_layout_is_case_and_spacing_tolerant(tmp_path: Path) -> None:
@@ -110,24 +113,24 @@ def test_detect_csv_layout_is_case_and_spacing_tolerant(tmp_path: Path) -> None:
     assert layout.orientation_columns == (" QX ", " QY ", " QZ ", " QW ")
     assert layout.rate_columns == (" Omega X ", " Omega Y ", " Omega Z ")
     assert layout.time_column == " Time S "
-
-
 ####
+
+
 
 
 def test_detect_csv_layout_rejects_multiple_rate_groups(tmp_path: Path) -> None:
     source = tmp_path / "trajectory.csv"
     source.write_text(
-        "time,qx,qy,qz,qw,p,q,r,wx,wy,wz\n"
-        "0,0,0,0,1,0,0,0,0,0,0\n",
+        "time,qx,qy,qz,qw,p,q,r,wx,wy,wz\n0,0,0,0,1,0,0,0,0,0,0\n",
         encoding="utf-8",
     )
 
     with pytest.raises(ValueError, match="Multiple plausible angular-rate"):
         detect_csv_layout(source)
-
-
+    ####
 ####
+
+
 
 
 def test_infer_csv_uses_auto_detected_layout(tmp_path: Path) -> None:
@@ -146,9 +149,9 @@ def test_infer_csv_uses_auto_detected_layout(tmp_path: Path) -> None:
 
     assert report.hypothesis_count == 1
     assert report.best.interval_rmse_rad < 1.0e-10
-
-
 ####
+
+
 
 
 def test_cli_auto_detection_and_json_output(
@@ -178,9 +181,9 @@ def test_cli_auto_detection_and_json_output(
     payload = json.loads(capsys.readouterr().out)
     assert payload["representation"] == "quaternion"
     assert payload["hypothesis_count"] == 1
-
-
 ####
+
+
 
 
 def test_cli_inspect_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -191,9 +194,9 @@ def test_cli_inspect_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
     payload = json.loads(capsys.readouterr().out)
     assert payload["orientation_columns"] == ["qx", "qy", "qz", "qw"]
     assert payload["time_column"] == "time_s"
-
-
 ####
+
+
 
 
 def test_python_module_entry_point(tmp_path: Path) -> None:
@@ -223,25 +226,25 @@ def test_python_module_entry_point(tmp_path: Path) -> None:
     assert completed.returncode == 0, completed.stderr
     payload = json.loads(completed.stdout)
     assert payload["representation"] == "quaternion"
-
-
 ####
+
+
 
 
 def test_version_is_exported() -> None:
-    assert __version__ == "0.4.0"
+    from importlib.metadata import version
 
-
+    assert __version__ == version("attitude-convention-inference")
+    assert __version__
 ####
+
+
 
 
 def test_detect_csv_layout_for_euler_columns(tmp_path: Path) -> None:
     source = tmp_path / "euler.csv"
     source.write_text(
-        "time,roll,pitch,yaw,wx,wy,wz\n"
-        "0,0,0,0,0,0,0\n"
-        "1,0,0,0,0,0,0\n"
-        "2,0,0,0,0,0,0\n",
+        "time,roll,pitch,yaw,wx,wy,wz\n0,0,0,0,0,0,0\n1,0,0,0,0,0,0\n2,0,0,0,0,0,0\n",
         encoding="utf-8",
     )
 
@@ -250,9 +253,9 @@ def test_detect_csv_layout_for_euler_columns(tmp_path: Path) -> None:
     assert layout.representation is AttitudeRepresentation.EULER
     assert layout.orientation_columns == ("roll", "pitch", "yaw")
     assert layout.rate_columns == ("wx", "wy", "wz")
-
-
 ####
+
+
 
 
 def test_negative_sample_period_override_is_rejected() -> None:
@@ -267,9 +270,10 @@ def test_negative_sample_period_override_is_rejected() -> None:
             representation="quaternion",
             sample_period_s=-0.1,
         )
-
-
+    ####
 ####
+
+
 
 
 def test_distribution_exposes_matching_primary_command() -> None:
@@ -287,11 +291,12 @@ def test_distribution_exposes_matching_primary_command() -> None:
     )
     assert payload["project"]["dependencies"] == [
         "numpy>=1.26.4",
+        "pydantic>=2.7",
         "scipy>=1.13",
     ]
-
-
 ####
+
+
 
 
 def test_canonical_infer_conventions_accepts_arrays() -> None:
@@ -302,11 +307,10 @@ def test_canonical_infer_conventions_accepts_arrays() -> None:
     time_s: list[float] = []
     for index in range(21):
         angle = 0.01 * index
-        orientation.append(
-            [0.0, 0.0, float(np.sin(angle / 2.0)), float(np.cos(angle / 2.0))]
-        )
+        orientation.append([0.0, 0.0, float(np.sin(angle / 2.0)), float(np.cos(angle / 2.0))])
         rates.append([0.0, 0.0, 1.0])
         time_s.append(0.01 * index)
+    ####
 
     report = infer_conventions(
         orientation,
@@ -323,18 +327,17 @@ def test_canonical_infer_conventions_accepts_arrays() -> None:
 
     assert report.hypothesis_count == 1
     assert report.best.interval_rmse_rad < 1.0e-10
-
-
 ####
 
 
-def test_runtime_source_has_no_pydantic_import() -> None:
-    project_root = Path(__file__).resolve().parents[1]
-    package_root = project_root / "src" / "attitude_convention_inference"
-    source = "\n".join(path.read_text(encoding="utf-8") for path in package_root.glob("*.py"))
-
-    assert "import pydantic" not in source
-    assert "from pydantic" not in source
 
 
+def test_runtime_models_use_pydantic() -> None:
+    from attitude_convention_inference.fusion import EvidencePacket
+    from attitude_convention_inference.models import InferenceConfig
+
+    assert InferenceConfig.model_json_schema()
+    assert EvidencePacket.model_json_schema()
 ####
+
+

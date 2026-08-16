@@ -1,29 +1,38 @@
 # Publishing
 
-The distribution name is `attitude-convention-inference`. The canonical command is `attitude-conventions`; the full distribution-name command remains as a 0.4.x compatibility alias.
+The distribution name is `attitude-convention-inference`. The canonical command is
+`attitude-conventions`; the full distribution-name command remains as a 0.0.x
+compatibility alias.
 
 ## Validate locally
 
 ```bash
 python -m pip install -e '.[dev,publish]'
-pytest -q
-ruff check .
-pyright
+python scripts/ci.py
 python -m build
 python -m twine check dist/*
+```
+
+To repair auto-fixable issues before checking, run `python scripts/ci.py --fix`.
+
+To regenerate the Pydantic schemas and deterministic example artifacts directly:
+
+```bash
+python scripts/generate_schemas.py --fix
+python scripts/generate_schemas.py --check
 ```
 
 Test the wheel as a one-off application:
 
 ```bash
-uvx --from ./dist/attitude_convention_inference-0.4.0-py3-none-any.whl \
+uvx --from ./dist/*.whl \
   attitude-conventions --help
 ```
 
 Test a persistent isolated installation:
 
 ```bash
-pipx install --force ./dist/attitude_convention_inference-0.4.0-py3-none-any.whl
+pipx install --force ./dist/*.whl
 attitude-conventions --version
 pipx uninstall attitude-convention-inference
 ```

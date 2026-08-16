@@ -30,5 +30,3 @@ report = infer_csv(
 )
 print(report.best.hypothesis.model_dump_json(indent=2))
 print(report.diagnostics.model_dump_json(indent=2))
-
-####

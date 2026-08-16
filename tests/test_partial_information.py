@@ -40,9 +40,9 @@ def _quaternion_data() -> tuple[np.ndarray, TrajectoryData]:
     )
     data = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s), truth)
     return time_s, data
-
-
 ####
+
+
 
 
 def test_scalar_and_subset_constraints_are_accepted() -> None:
@@ -59,9 +59,9 @@ def test_scalar_and_subset_constraints_are_accepted() -> None:
     assert config.constraints.quaternion_order == (QuaternionOrder.SCALAR_FIRST,)
     assert config.constraints.rate_frame == (RateFrame.WORLD,)
     assert config.constraints.rate_order == ("pqr", "rqp")
-
-
 ####
+
+
 
 
 def test_constraints_intersect_legacy_search_space() -> None:
@@ -71,9 +71,9 @@ def test_constraints_intersect_legacy_search_space() -> None:
     )
 
     assert config.resolved_search_space().rate_orders == ("pqr", "rqp")
-
-
 ####
+
+
 
 
 def test_contradictory_constraint_is_rejected() -> None:
@@ -82,9 +82,10 @@ def test_contradictory_constraint_is_rejected() -> None:
             search_space=SearchSpace(rate_frames=(RateFrame.BODY,)),
             constraints=ConventionConstraints(rate_frame=RateFrame.WORLD),
         )
-
-
+    ####
 ####
+
+
 
 
 def test_partial_information_reduces_and_documents_hypothesis_space() -> None:
@@ -111,9 +112,9 @@ def test_partial_information_reduces_and_documents_hypothesis_space() -> None:
     assert assessments["quaternion_order"].status is DimensionStatus.FIXED
     assert assessments["rate_order"].status is DimensionStatus.INFERRED
     assert assessments["euler_order"].status is DimensionStatus.NOT_APPLICABLE
-
-
 ####
+
+
 
 
 def test_soft_prior_selects_tie_without_erasing_evidence_ambiguity() -> None:
@@ -139,9 +140,7 @@ def test_soft_prior_selects_tie_without_erasing_evidence_ambiguity() -> None:
             quaternion_order=QuaternionOrder.SCALAR_LAST,
             rate_order="pqr",
         ),
-        priors=ConventionPriors(
-            rate_frame={RateFrame.BODY: 4.0, RateFrame.WORLD: 1.0}
-        ),
+        priors=ConventionPriors(rate_frame={RateFrame.BODY: 4.0, RateFrame.WORLD: 1.0}),
     )
     report = infer_conventions(data, config)
 
@@ -154,13 +153,12 @@ def test_soft_prior_selects_tie_without_erasing_evidence_ambiguity() -> None:
     assert report.diagnostics.unresolved_dimensions["rate_frame"] == ("body", "world")
     assert "rate_frame" not in report.diagnostics.posterior_unresolved_dimensions
     assert (
-        report.diagnostics.dimension_assessments["rate_frame"].status
-        is DimensionStatus.AMBIGUOUS
+        report.diagnostics.dimension_assessments["rate_frame"].status is DimensionStatus.AMBIGUOUS
     )
     assert any("empirical ambiguity remains" in item for item in report.diagnostics.warnings)
-
-
 ####
+
+
 
 
 def test_prior_json_uses_relative_weights() -> None:
@@ -177,9 +175,9 @@ def test_prior_json_uses_relative_weights() -> None:
     assert config.priors.attitude_direction[AttitudeDirection.BODY_TO_WORLD] == 3.0
     assert config.priors.rate_frame[RateFrame.BODY] == 4.0
     assert config.priors.rate_order["pqr"] == 2.0
-
-
 ####
+
+
 
 
 def test_cli_convention_flags_lock_all_relevant_dimensions(tmp_path: Path) -> None:
@@ -200,10 +198,12 @@ def test_cli_convention_flags_lock_all_relevant_dimensions(tmp_path: Path) -> No
                 "r": 1.0,
             }
         )
+    ####
     with source.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+    ####
 
     exit_code = main(
         [
@@ -245,6 +245,6 @@ def test_cli_convention_flags_lock_all_relevant_dimensions(tmp_path: Path) -> No
     assert payload["hypothesis_count"] == 1
     assert payload["hypothesis_space"]["constrained_hypothesis_count"] == 1
     assert payload["diagnostics"]["dimension_assessments"]["rate_frame"]["status"] == "fixed"
-
-
 ####
+
+

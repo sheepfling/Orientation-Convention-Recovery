@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -27,9 +25,9 @@ from attitude_convention_inference.synthetic import (
 
 def _time(sample_count: int = 161, dt: float = 0.025) -> np.ndarray:
     return np.arange(sample_count, dtype=np.float64) * dt
-
-
 ####
+
+
 
 
 def test_recovers_scalar_first_world_to_body_world_rates_and_rqp_order() -> None:
@@ -52,9 +50,9 @@ def test_recovers_scalar_first_world_to_body_world_rates_and_rqp_order() -> None
     assert best.rate_order == truth.rate_order
     assert report.best.interval_rmse_rad < 1.0e-7
     assert report.diagnostics.confidence > 0.70
-
-
 ####
+
+
 
 
 def test_recovers_euler_intrinsic_order_direction_and_degree_units() -> None:
@@ -121,9 +119,9 @@ def test_recovers_euler_intrinsic_order_direction_and_degree_units() -> None:
     assert best.rate_order == truth.rate_order
     assert best.rate_unit is truth.rate_unit
     assert constrained_report.best.interval_rmse_rad < 1.0e-7
-
-
 ####
+
+
 
 
 def test_infers_missing_constant_sample_period() -> None:
@@ -153,9 +151,9 @@ def test_infers_missing_constant_sample_period() -> None:
     assert report.best.inferred_sample_period_s is not None
     assert abs(report.best.inferred_sample_period_s - 0.04) < 2.0e-4
     assert report.diagnostics.time_source == "inferred_sample_period"
-
-
 ####
+
+
 
 
 def test_quaternion_sign_flips_do_not_change_inference() -> None:
@@ -179,9 +177,9 @@ def test_quaternion_sign_flips_do_not_change_inference() -> None:
     assert report.best.hypothesis.quaternion_order is QuaternionOrder.SCALAR_LAST
     assert report.best.hypothesis.attitude_direction is AttitudeDirection.BODY_TO_WORLD
     assert report.best.interval_rmse_rad < 1.0e-7
-
-
 ####
+
+
 
 
 def test_coaxial_motion_marks_body_vs_world_rate_frame_ambiguous() -> None:
@@ -215,9 +213,9 @@ def test_coaxial_motion_marks_body_vs_world_rate_frame_ambiguous() -> None:
     assert "rate_frame" in report.diagnostics.unresolved_dimensions
     assert report.diagnostics.confidence < 0.50
     assert report.diagnostics.effective_excitation_rank < 1.05
-
-
 ####
+
+
 
 
 def test_very_slow_motion_caps_confidence() -> None:
@@ -243,12 +241,11 @@ def test_very_slow_motion_caps_confidence() -> None:
 
     assert report.diagnostics.confidence <= 0.35
     assert any(
-        "little total rotational excitation" in warning
-        for warning in report.diagnostics.warnings
+        "little total rotational excitation" in warning for warning in report.diagnostics.warnings
     )
-
-
 ####
+
+
 
 
 def test_high_rate_per_sample_wrap_caps_confidence_and_warns() -> None:
@@ -277,9 +274,9 @@ def test_high_rate_per_sample_wrap_caps_confidence_and_warns() -> None:
     assert report.best.hard_alias_fraction > 0.0
     assert report.diagnostics.confidence <= 0.35
     assert any("wrap count" in warning for warning in report.diagnostics.warnings)
-
-
 ####
+
+
 
 
 def test_partial_constraints_reduce_hypothesis_count() -> None:
@@ -302,6 +299,6 @@ def test_partial_constraints_reduce_hypothesis_count() -> None:
     data = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s), truth)
     report = infer_conventions(data, config)
     assert report.hypothesis_count == 2
-
-
 ####
+
+
