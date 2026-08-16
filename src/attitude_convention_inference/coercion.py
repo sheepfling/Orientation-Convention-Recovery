@@ -47,8 +47,6 @@ def coerce_config(value: ConfigInput) -> InferenceConfig:
 ####
 
 
-
-
 def coerce_constraints(value: ConstraintInput) -> ConventionConstraints | None:
     """Coerce optional constraint input while preserving an omitted value."""
 
@@ -60,8 +58,6 @@ def coerce_constraints(value: ConstraintInput) -> ConventionConstraints | None:
     ####
     return ConventionConstraints.model_validate(value)
 ####
-
-
 
 
 def coerce_priors(value: PriorInput) -> ConventionPriors | None:
@@ -77,8 +73,6 @@ def coerce_priors(value: PriorInput) -> ConventionPriors | None:
 ####
 
 
-
-
 def coerce_domain_prior(value: DomainPriorInput) -> DomainPrior | None:
     """Coerce optional domain-prior input."""
 
@@ -90,8 +84,6 @@ def coerce_domain_prior(value: DomainPriorInput) -> DomainPrior | None:
     ####
     return DomainPrior.model_validate(value)
 ####
-
-
 
 
 def coerce_preference_profile(
@@ -109,8 +101,6 @@ def coerce_preference_profile(
 ####
 
 
-
-
 def merge_priors(base: ConventionPriors, override: ConventionPriors) -> ConventionPriors:
     """Merge dimension weights, with override values taking precedence."""
 
@@ -121,4 +111,3 @@ def merge_priors(base: ConventionPriors, override: ConventionPriors) -> Conventi
     ####
     return ConventionPriors.model_validate(payload)
 ####
-

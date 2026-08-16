@@ -63,15 +63,11 @@ def relevant_dimensions(representation: AttitudeRepresentation) -> tuple[str, ..
 ####
 
 
-
-
 def search_values(search: SearchSpace, dimension: str) -> tuple[object, ...]:
     """Return the configured values for one named search dimension."""
 
     return tuple(getattr(search, SEARCH_FIELD_BY_DIMENSION[dimension]))
 ####
-
-
 
 
 def hypothesis_count(
@@ -86,8 +82,6 @@ def hypothesis_count(
     ####
     return count
 ####
-
-
 
 
 def generate_hypotheses(
@@ -145,5 +139,3 @@ def generate_hypotheses(
     ####
     return tuple(hypotheses)
 ####
-
-

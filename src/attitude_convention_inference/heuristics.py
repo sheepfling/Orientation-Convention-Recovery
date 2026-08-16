@@ -64,8 +64,6 @@ class WrapUnitDiagnostics:
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class EulerHeuristicDiagnostics:
     """Named diagnostics for Euler range, branch, and singularity behavior."""
@@ -75,8 +73,6 @@ class EulerHeuristicDiagnostics:
     singularity_margin: float | None
     branch_cost_rad2: float
 ####
-
-
 
 
 def gimbal_lock_fraction(
@@ -102,13 +98,9 @@ def gimbal_lock_fraction(
 ####
 
 
-
-
 def _wrap_angle(values: FloatArray) -> FloatArray:
     return (values + pi) % (2.0 * pi) - pi
 ####
-
-
 
 
 def wrap_unit_diagnostics(
@@ -152,8 +144,6 @@ def wrap_unit_diagnostics(
         score=-gain + 0.25 * wrap_count,
     )
 ####
-
-
 
 
 def euler_heuristic_diagnostics(
@@ -226,5 +216,3 @@ def euler_heuristic_diagnostics(
         branch_cost_rad2=float(amin(costs[-1])),
     )
 ####
-
-

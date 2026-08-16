@@ -41,9 +41,6 @@ class WeightedPreferenceProfile(FrozenModel):
 ####
 
 
-
-
-
 def _profile_directory() -> Traversable:
     resource = files("attitude_convention_inference")
     for component in _PROFILE_DIRECTORY:
@@ -51,8 +48,6 @@ def _profile_directory() -> Traversable:
     ####
     return resource
 ####
-
-
 
 
 def available_preference_profiles() -> tuple[str, ...]:
@@ -66,8 +61,6 @@ def available_preference_profiles() -> tuple[str, ...]:
         )
     )
 ####
-
-
 
 
 def load_preference_profile(profile_id: str = DEFAULT_PROFILE_ID) -> PreferenceProfile:
@@ -101,8 +94,6 @@ def load_preference_profile(profile_id: str = DEFAULT_PROFILE_ID) -> PreferenceP
     ####
     return profile
 ####
-
-
 
 
 def _combined_mapping(
@@ -148,8 +139,6 @@ def _combined_mapping(
     ####
     return result
 ####
-
-
 
 
 def compose_preference_profiles(
@@ -219,5 +208,3 @@ def compose_preference_profiles(
         strength=strength,
     )
 ####
-
-

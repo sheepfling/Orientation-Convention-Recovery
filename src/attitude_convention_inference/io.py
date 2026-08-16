@@ -68,13 +68,9 @@ class CsvLayout:
 ####
 
 
-
-
 def _normalize_column_name(value: str) -> str:
     return value.strip().lower().replace("-", "_").replace(" ", "_")
 ####
-
-
 
 
 def read_csv_columns(path: str | Path) -> tuple[str, ...]:
@@ -99,8 +95,6 @@ def read_csv_columns(path: str | Path) -> tuple[str, ...]:
 ####
 
 
-
-
 def _normalized_lookup(columns: Sequence[str]) -> dict[str, str]:
     lookup: dict[str, str] = {}
     for column in columns:
@@ -115,8 +109,6 @@ def _normalized_lookup(columns: Sequence[str]) -> dict[str, str]:
     ####
     return lookup
 ####
-
-
 
 
 def _resolve_explicit_columns(
@@ -141,8 +133,6 @@ def _resolve_explicit_columns(
 ####
 
 
-
-
 def _matching_groups(
     groups: Sequence[Sequence[str]],
     lookup: dict[str, str],
@@ -155,8 +145,6 @@ def _matching_groups(
     ####
     return tuple(matches)
 ####
-
-
 
 
 def _select_single_group(
@@ -203,8 +191,6 @@ def _select_single_group(
     ####
     return collapsed[0]
 ####
-
-
 
 
 def detect_csv_layout(
@@ -316,8 +302,6 @@ def detect_csv_layout(
 ####
 
 
-
-
 def load_csv_trajectory(
     path: str | Path,
     representation: AttitudeRepresentation,
@@ -373,8 +357,6 @@ def load_csv_trajectory(
 ####
 
 
-
-
 def load_config(path: str | Path) -> InferenceConfig:
     with Path(path).open("r", encoding="utf-8") as stream:
         payload: Any = json.load(stream)
@@ -383,13 +365,9 @@ def load_config(path: str | Path) -> InferenceConfig:
 ####
 
 
-
-
 def write_report(path: str | Path, report: InferenceReport) -> None:
     Path(path).write_text(report.model_dump_json(indent=2), encoding="utf-8")
 ####
-
-
 
 
 def write_interval_diagnostics(
@@ -406,5 +384,3 @@ def write_interval_diagnostics(
         writer.writerows(rows)
     ####
 ####
-
-

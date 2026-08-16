@@ -196,8 +196,6 @@ def _parser() -> argparse.ArgumentParser:
 ####
 
 
-
-
 def _cli_constraints(arguments: argparse.Namespace) -> ConventionConstraints:
     return ConventionConstraints(
         attitude_direction=arguments.attitude_direction,
@@ -213,8 +211,6 @@ def _cli_constraints(arguments: argparse.Namespace) -> ConventionConstraints:
 ####
 
 
-
-
 def _layout_payload(layout: CsvLayout) -> dict[str, object]:
     return {
         "representation": layout.representation.value,
@@ -226,8 +222,6 @@ def _layout_payload(layout: CsvLayout) -> dict[str, object]:
 ####
 
 
-
-
 def _print_layout(layout: CsvLayout) -> None:
     print("Input layout")
     print(f"  representation: {layout.representation.value}")
@@ -235,8 +229,6 @@ def _print_layout(layout: CsvLayout) -> None:
     print(f"  rates:          {', '.join(layout.rate_columns)}")
     print(f"  time:           {layout.time_column or '<none>'}")
 ####
-
-
 
 
 def _print_profile_catalog(profiles: Sequence[PreferenceProfile]) -> None:
@@ -249,8 +241,6 @@ def _print_profile_catalog(profiles: Sequence[PreferenceProfile]) -> None:
         ####
     ####
 ####
-
-
 
 
 def _print_report(report_json: str, top: int) -> None:
@@ -376,8 +366,6 @@ def _print_report(report_json: str, top: int) -> None:
 ####
 
 
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     arguments = parser.parse_args(argv)
@@ -499,8 +487,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error(str(error))
     ####
 ####
-
-
 
 
 if __name__ == "__main__":

@@ -95,8 +95,6 @@ class SamplePeriodEstimate:
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class IntervalDurationResolution:
     """Resolved interval durations together with their provenance and warnings."""
@@ -106,8 +104,6 @@ class IntervalDurationResolution:
     source: str
     warnings: tuple[str, ...]
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,8 +116,6 @@ class IntegratedIntervals:
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class WindowComposition:
     """Window-composed rotations and the source interval start indices."""
@@ -129,8 +123,6 @@ class WindowComposition:
     window_increments: Rotation
     starts: NDArray[int64]
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,14 +134,10 @@ class QuaternionNormStatistics:
 ####
 
 
-
-
 class _ScalarMinimizeResult(Protocol):
     success: bool
     x: float
 ####
-
-
 
 
 _typed_minimize_scalar = cast(
@@ -176,8 +164,6 @@ def should_prune_by_exact_lower_bound(
     ####
     return lower_bound > incumbent
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,7 +237,6 @@ class TrajectoryData:
         object.__setattr__(self, "time_s", time_s)
     ####
 
-
     @property
     def sample_count(self) -> int:
         if self.orientation is not None:
@@ -263,9 +248,6 @@ class TrajectoryData:
         raise RuntimeError("TrajectoryData has no streams.")
     ####
 ####
-
-
-
 
 
 def decode_attitudes(data: TrajectoryData, hypothesis: ConventionHypothesis) -> Rotation:
@@ -304,8 +286,6 @@ def decode_attitudes(data: TrajectoryData, hypothesis: ConventionHypothesis) -> 
 ####
 
 
-
-
 def decode_rates(data: TrajectoryData, hypothesis: ConventionHypothesis) -> FloatArray:
     if data.rates is None:
         raise ValueError("No angular-rate stream is available for this operation.")
@@ -320,8 +300,6 @@ def decode_rates(data: TrajectoryData, hypothesis: ConventionHypothesis) -> Floa
 ####
 
 
-
-
 def observed_interval_increments(attitudes: Rotation, frame: RateFrame) -> Rotation:
     previous = attitudes[:-1]
     following = attitudes[1:]
@@ -330,8 +308,6 @@ def observed_interval_increments(attitudes: Rotation, frame: RateFrame) -> Rotat
     ####
     return following * previous.inv()
 ####
-
-
 
 
 def infer_constant_sample_period(
@@ -388,8 +364,6 @@ def infer_constant_sample_period(
 ####
 
 
-
-
 def _period_geometric_risk(
     period_s: float,
     attitudes: Rotation,
@@ -422,8 +396,6 @@ def _period_geometric_risk(
     ####
     return float(mean(scale_risks)) if scale_risks else float("inf")
 ####
-
-
 
 
 def refine_constant_sample_period(
@@ -459,7 +431,6 @@ def refine_constant_sample_period(
             return _period_geometric_risk(float(period), attitudes, rates_rad_s, frame, config)
         ####
 
-
         refined = _typed_minimize_scalar(
             objective,
             bounds=(lower_bound, upper_bound),
@@ -470,7 +441,6 @@ def refine_constant_sample_period(
             candidate_periods.append(float(refined.x))
         ####
     ####
-
 
     refine(
         max(lower, initial_estimate.period_s / 1.5),
@@ -495,8 +465,6 @@ def refine_constant_sample_period(
     ####
     return SamplePeriodEstimate(float(best), tuple(warnings))
 ####
-
-
 
 
 def resolve_interval_durations(
@@ -531,8 +499,6 @@ def resolve_interval_durations(
 ####
 
 
-
-
 def integrate_interval_increments(
     rates_rad_s: FloatArray,
     interval_durations_s: FloatArray,
@@ -559,8 +525,6 @@ def integrate_interval_increments(
         rate_change_angles_rad=rate_change_angles,
     )
 ####
-
-
 
 
 def compose_increment_windows(
@@ -601,8 +565,6 @@ def compose_increment_windows(
 ####
 
 
-
-
 def observed_window_increments(
     attitudes: Rotation,
     starts: NDArray[int64],
@@ -616,8 +578,6 @@ def observed_window_increments(
     ####
     return following * previous.inv()
 ####
-
-
 
 
 def quaternion_norm_statistics(data: TrajectoryData) -> QuaternionNormStatistics | None:
@@ -634,5 +594,3 @@ def quaternion_norm_statistics(data: TrajectoryData) -> QuaternionNormStatistics
         max_abs_error=float(amax(errors)),
     )
 ####
-
-

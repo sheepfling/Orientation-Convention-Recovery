@@ -26,8 +26,6 @@ def generate_schemas(root: Path) -> None:
 ####
 
 
-
-
 def _generated_example_paths() -> tuple[str, ...]:
     return (
         "examples/partially_known_config.json",
@@ -40,8 +38,6 @@ def _generated_example_paths() -> tuple[str, ...]:
         "examples/cohort_fusion/packet_C.json",
     )
 ####
-
-
 
 
 def check_generated_files(root: Path) -> None:
@@ -59,8 +55,6 @@ def check_generated_files(root: Path) -> None:
         raise SystemExit(f"Generated files are out of date:\n{details}\nRun with --fix.")
     ####
 ####
-
-
 
 
 def main() -> None:
@@ -84,8 +78,6 @@ def main() -> None:
         generate_schemas(root)
     ####
 ####
-
-
 
 
 if __name__ == "__main__":

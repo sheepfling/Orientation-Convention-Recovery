@@ -32,8 +32,6 @@ def _time(sample_count: int = 81, dt: float = 0.025) -> np.ndarray:
 ####
 
 
-
-
 def _from_quat(quaternions: np.ndarray, *, scalar_first: bool = False) -> Rotation:
     return cast(
         Rotation,
@@ -42,20 +40,14 @@ def _from_quat(quaternions: np.ndarray, *, scalar_first: bool = False) -> Rotati
 ####
 
 
-
-
 def _from_rotvec(rotvecs: np.ndarray) -> Rotation:
     return cast(Rotation, cast(Any, Rotation).from_rotvec(rotvecs))
 ####
 
 
-
-
 def _quaternions(rotation: Rotation, *, scalar_first: bool = False) -> np.ndarray:
     return np.asarray(cast(Any, rotation).as_quat(scalar_first=scalar_first), dtype=np.float64)
 ####
-
-
 
 
 QUATERNION_CASES = tuple(
@@ -108,8 +100,6 @@ def test_quaternion_convention_matrix(
 ####
 
 
-
-
 EULER_CASES = tuple(product(("xyz", "zxy", "zyx"), tuple(EulerMode), tuple(AttitudeDirection)))
 
 
@@ -150,8 +140,6 @@ def test_euler_convention_matrix_with_rate_axes_anchored(
     assert best.attitude_direction is direction
     assert report.best.interval_rmse_rad < 1.0e-6
 ####
-
-
 
 
 def test_trimmed_multiscale_score_tolerates_sparse_attitude_outliers() -> None:
@@ -200,8 +188,6 @@ def test_trimmed_multiscale_score_tolerates_sparse_attitude_outliers() -> None:
 ####
 
 
-
-
 def test_rate_unit_and_missing_time_are_reported_as_unidentifiable_when_both_free() -> None:
     time_s = _time(sample_count=121, dt=0.04)
     truth = SyntheticConvention(
@@ -243,5 +229,3 @@ def test_rate_unit_and_missing_time_are_reported_as_unidentifiable_when_both_fre
     assert periods[0] < periods[1]
     assert report.diagnostics.confidence < 0.50
 ####
-
-

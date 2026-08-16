@@ -22,13 +22,9 @@ class _DirectWindowComposition:
 ####
 
 
-
-
 def _rotation_from_quat(quaternions: FloatArray) -> Rotation:
     return cast(Rotation, cast(Any, Rotation).from_quat(quaternions))
 ####
-
-
 
 
 def _rotation_from_rotvec(rotvecs: FloatArray) -> Rotation:
@@ -36,13 +32,9 @@ def _rotation_from_rotvec(rotvecs: FloatArray) -> Rotation:
 ####
 
 
-
-
 def _rotation_magnitudes(rotation: Rotation) -> FloatArray:
     return asarray(cast(Any, rotation).magnitude(), dtype=float64)
 ####
-
-
 
 
 def _direct_windows(
@@ -68,8 +60,6 @@ def _direct_windows(
 ####
 
 
-
-
 def _elapsed(function: Callable[[], object], repeats: int) -> float:
     samples: list[float] = []
     for _ in range(repeats):
@@ -79,8 +69,6 @@ def _elapsed(function: Callable[[], object], repeats: int) -> float:
     ####
     return float(median(samples))
 ####
-
-
 
 
 def _benchmark_case(
@@ -118,8 +106,6 @@ def _benchmark_case(
 ####
 
 
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Benchmark direct versus prefix-product rotation windows."
@@ -144,8 +130,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(json.dumps({"seed": arguments.seed, "results": results}, indent=2))
     return 0
 ####
-
-
 
 
 if __name__ == "__main__":

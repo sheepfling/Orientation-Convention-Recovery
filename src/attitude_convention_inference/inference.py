@@ -109,8 +109,6 @@ class _ScoredCandidate:
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class _EvidenceSummary:
     """Statistical evidence and sufficiency metrics for a candidate hypothesis."""
@@ -123,8 +121,6 @@ class _EvidenceSummary:
     fraction: float
     log_likelihood_ratio: float
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,8 +136,6 @@ class _OperationalSelection:
     preference_profile_supported_class_ids: tuple[str, ...]
     representative_reason: str
 ####
-
-
 
 
 def _score_hypothesis(
@@ -334,13 +328,9 @@ def _score_hypothesis(
 ####
 
 
-
-
 def _hypothesis_value(hypothesis: ConventionHypothesis, dimension: str) -> object | None:
     return getattr(hypothesis, dimension)
 ####
-
-
 
 
 def _prior_log_weight(
@@ -360,8 +350,6 @@ def _prior_log_weight(
 ####
 
 
-
-
 def _replace_result(
     item: _ScoredCandidate,
     result: CandidateResult,
@@ -379,8 +367,6 @@ def _replace_result(
 ####
 
 
-
-
 def _rate_unit_partner(hypothesis: ConventionHypothesis) -> ConventionHypothesis:
     rate_unit = (
         RateUnit.DEGREES_PER_SECOND
@@ -389,8 +375,6 @@ def _rate_unit_partner(hypothesis: ConventionHypothesis) -> ConventionHypothesis
     )
     return hypothesis.model_copy(update={"rate_unit": rate_unit})
 ####
-
-
 
 
 def _canonical_key(hypothesis: ConventionHypothesis) -> tuple[str, ...]:
@@ -412,8 +396,6 @@ def _canonical_key(hypothesis: ConventionHypothesis) -> tuple[str, ...]:
 ####
 
 
-
-
 def _period_is_active_bound(result: CandidateResult, config: InferenceConfig) -> bool:
     if result.inferred_sample_period_s is None:
         return False
@@ -425,8 +407,6 @@ def _period_is_active_bound(result: CandidateResult, config: InferenceConfig) ->
         or abs(result.inferred_sample_period_s - upper) <= tolerance
     )
 ####
-
-
 
 
 def _annotate_exact_equivalences(
@@ -523,8 +503,6 @@ def _annotate_exact_equivalences(
 ####
 
 
-
-
 def _result_label(data: TrajectoryData, config: InferenceConfig) -> ResultLabel:
     if data.orientation is None and data.rates is None:
         return ResultLabel.NO_DATA
@@ -540,8 +518,6 @@ def _result_label(data: TrajectoryData, config: InferenceConfig) -> ResultLabel:
     ####
     return ResultLabel.TRAJECTORY_QUOTIENT
 ####
-
-
 
 
 def _evidence_contender_classes(
@@ -574,8 +550,6 @@ def _evidence_contender_classes(
         <= config.near_tie_delta_criterion
     )
 ####
-
-
 
 
 def _select_operational_result(
@@ -677,7 +651,6 @@ def _select_operational_result(
             return total
         ####
 
-
         preference_scores = {
             item.result.hypothesis.identifier(): preference_log_weight(item)
             for item in selected_members
@@ -712,8 +685,6 @@ def _select_operational_result(
         representative_reason=representative_reason,
     )
 ####
-
-
 
 
 def _score_partial_hypothesis(
@@ -818,8 +789,6 @@ def _score_partial_hypothesis(
 ####
 
 
-
-
 def _ranks_with_exact_ties(order: NDArray[Any], values: NDArray[Any]) -> dict[int, int]:
     ranks: dict[int, int] = {}
     previous: float | None = None
@@ -835,8 +804,6 @@ def _ranks_with_exact_ties(order: NDArray[Any], values: NDArray[Any]) -> dict[in
     ####
     return ranks
 ####
-
-
 
 
 def _assign_ranks_and_support(
@@ -879,7 +846,6 @@ def _assign_ranks_and_support(
         ####
         return max(0.0, next_risk - class_risks[item.result.equivalence_class_id])
     ####
-
 
     candidates = tuple(
         _replace_result(
@@ -934,7 +900,6 @@ def _assign_ranks_and_support(
         )
     ####
 
-
     data_order: NDArray[intp] = asarray(
         sorted(range(len(candidates)), key=_data_sort_key),
         dtype=intp,
@@ -958,7 +923,6 @@ def _assign_ranks_and_support(
             _canonical_key(candidates[index].result.hypothesis),
         )
     ####
-
 
     posterior_order: NDArray[intp] = asarray(
         sorted(range(len(candidates)), key=_posterior_sort_key),
@@ -988,8 +952,6 @@ def _assign_ranks_and_support(
     ####
     return tuple(ranked)
 ####
-
-
 
 
 def _evidence_summary(
@@ -1078,14 +1040,10 @@ def _evidence_summary(
 ####
 
 
-
-
 def _hypothesis_dimensions(hypothesis: ConventionHypothesis) -> dict[str, str]:
     values = hypothesis.model_dump(mode="json")
     return {key: str(value) for key, value in values.items() if value is not None}
 ####
-
-
 
 
 def _unresolved_dimensions(
@@ -1101,8 +1059,6 @@ def _unresolved_dimensions(
 ####
 
 
-
-
 def _relative_prior_weights(
     dimension: str,
     allowed_values: tuple[object, ...],
@@ -1116,8 +1072,6 @@ def _relative_prior_weights(
     maximum = max(weights.values())
     return {key: weight / maximum for key, weight in weights.items()}
 ####
-
-
 
 
 def _hypothesis_space_summary(
@@ -1164,8 +1118,6 @@ def _hypothesis_space_summary(
 ####
 
 
-
-
 def _dimension_values(
     candidates: tuple[_ScoredCandidate, ...],
     dimension: str,
@@ -1177,8 +1129,6 @@ def _dimension_values(
     }
     return tuple(sorted(values))
 ####
-
-
 
 
 def _dimension_assessments(
@@ -1236,8 +1186,6 @@ def _dimension_assessments(
 ####
 
 
-
-
 def _confidence_label(value: float) -> ConfidenceLabel:
     if value >= 0.75:
         return ConfidenceLabel.HIGH
@@ -1250,8 +1198,6 @@ def _confidence_label(value: float) -> ConfidenceLabel:
     ####
     return ConfidenceLabel.INDETERMINATE
 ####
-
-
 
 
 def _build_overall_diagnostics(
@@ -1493,8 +1439,6 @@ def _build_overall_diagnostics(
 ####
 
 
-
-
 def _build_inference_report(
     data: TrajectoryData,
     hypotheses: tuple[ConventionHypothesis, ...],
@@ -1543,8 +1487,6 @@ def _build_inference_report(
         representative_selection_reason=operational.representative_reason,
     )
 ####
-
-
 
 
 def infer_trajectory_conventions(
@@ -1623,8 +1565,6 @@ def infer_trajectory_conventions(
 ####
 
 
-
-
 def best_interval_diagnostics(
     data: TrajectoryData,
     report: InferenceReport,
@@ -1674,5 +1614,3 @@ def best_interval_diagnostics(
     ####
     return tuple(rows)
 ####
-
-

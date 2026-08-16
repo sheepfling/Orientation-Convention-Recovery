@@ -28,8 +28,6 @@ def _time(sample_count: int = 161, dt: float = 0.025) -> np.ndarray:
 ####
 
 
-
-
 def test_recovers_scalar_first_world_to_body_world_rates_and_rqp_order() -> None:
     time_s = _time()
     rates = rich_three_axis_rates(time_s)
@@ -51,8 +49,6 @@ def test_recovers_scalar_first_world_to_body_world_rates_and_rqp_order() -> None
     assert report.best.interval_rmse_rad < 1.0e-7
     assert report.diagnostics.confidence > 0.70
 ####
-
-
 
 
 def test_recovers_euler_intrinsic_order_direction_and_degree_units() -> None:
@@ -122,8 +118,6 @@ def test_recovers_euler_intrinsic_order_direction_and_degree_units() -> None:
 ####
 
 
-
-
 def test_infers_missing_constant_sample_period() -> None:
     time_s = _time(sample_count=201, dt=0.04)
     rates = rich_three_axis_rates(time_s, scale=0.8)
@@ -154,8 +148,6 @@ def test_infers_missing_constant_sample_period() -> None:
 ####
 
 
-
-
 def test_quaternion_sign_flips_do_not_change_inference() -> None:
     time_s = _time()
     rates = rich_three_axis_rates(time_s)
@@ -178,8 +170,6 @@ def test_quaternion_sign_flips_do_not_change_inference() -> None:
     assert report.best.hypothesis.attitude_direction is AttitudeDirection.BODY_TO_WORLD
     assert report.best.interval_rmse_rad < 1.0e-7
 ####
-
-
 
 
 def test_coaxial_motion_marks_body_vs_world_rate_frame_ambiguous() -> None:
@@ -216,8 +206,6 @@ def test_coaxial_motion_marks_body_vs_world_rate_frame_ambiguous() -> None:
 ####
 
 
-
-
 def test_very_slow_motion_caps_confidence() -> None:
     time_s = _time(sample_count=81, dt=0.02)
     rates = rich_three_axis_rates(time_s, scale=1.0e-4)
@@ -244,8 +232,6 @@ def test_very_slow_motion_caps_confidence() -> None:
         "little total rotational excitation" in warning for warning in report.diagnostics.warnings
     )
 ####
-
-
 
 
 def test_high_rate_per_sample_wrap_caps_confidence_and_warns() -> None:
@@ -277,8 +263,6 @@ def test_high_rate_per_sample_wrap_caps_confidence_and_warns() -> None:
 ####
 
 
-
-
 def test_partial_constraints_reduce_hypothesis_count() -> None:
     config = InferenceConfig(
         search_space=SearchSpace(
@@ -300,5 +284,3 @@ def test_partial_constraints_reduce_hypothesis_count() -> None:
     report = infer_conventions(data, config)
     assert report.hypothesis_count == 2
 ####
-
-

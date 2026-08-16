@@ -62,8 +62,6 @@ def packet(
 ####
 
 
-
-
 def test_document_example_matches_expected_values() -> None:
     result = fuse_target_with_robust_borrowing(
         packet("C", (1.4, 1.0, 0.8), "source-C"),
@@ -80,8 +78,6 @@ def test_document_example_matches_expected_values() -> None:
 ####
 
 
-
-
 def test_target_conflict_reduces_sharedness_and_abstains() -> None:
     result = fuse_target_with_robust_borrowing(
         packet("C", (0.3, 3.0, 1.0), "source-C"),
@@ -94,8 +90,6 @@ def test_target_conflict_reduces_sharedness_and_abstains() -> None:
     assert result.fused_posterior["C1"] == pytest.approx(0.44795371, abs=1.0e-8)
     assert result.fused_posterior["C2"] == pytest.approx(0.42836669, abs=1.0e-8)
 ####
-
-
 
 
 def test_overlap_and_dependency_groups_are_rejected() -> None:
@@ -125,8 +119,6 @@ def test_overlap_and_dependency_groups_are_rejected() -> None:
 ####
 
 
-
-
 def test_uncalibrated_packet_returns_weight_only_status() -> None:
     result = fuse_target_with_robust_borrowing(
         packet("C", (1.4, 1.0, 0.8), "source-C", calibrated=False),
@@ -137,8 +129,6 @@ def test_uncalibrated_packet_returns_weight_only_status() -> None:
     assert not result.probability_valid
     assert result.warnings
 ####
-
-
 
 
 def test_duplicate_packet_ids_are_rejected() -> None:
@@ -154,8 +144,6 @@ def test_duplicate_packet_ids_are_rejected() -> None:
 ####
 
 
-
-
 def test_empty_reference_cohort_is_rejected() -> None:
     with pytest.raises(ValueError, match="at least one reference packet"):
         fuse_target_with_robust_borrowing(
@@ -165,8 +153,6 @@ def test_empty_reference_cohort_is_rejected() -> None:
         )
     ####
 ####
-
-
 
 
 def test_invalid_power_and_sharedness_are_rejected() -> None:
@@ -183,8 +169,6 @@ def test_invalid_power_and_sharedness_are_rejected() -> None:
         )
     ####
 ####
-
-
 
 
 def test_nonfinite_packet_evidence_and_nonpositive_priors_are_rejected() -> None:
@@ -208,8 +192,6 @@ def test_nonfinite_packet_evidence_and_nonpositive_priors_are_rejected() -> None
 ####
 
 
-
-
 def test_coalescence_rejects_class_order_and_baseline_prior_mismatches() -> None:
     reordered = packet("B", (6.0, 1.0, 0.5), "source-B").model_copy(
         update={"class_ids": ("C2", "C1", "C3")}
@@ -225,8 +207,6 @@ def test_coalescence_rejects_class_order_and_baseline_prior_mismatches() -> None
         )
     ####
 ####
-
-
 
 
 def test_quotient_mismatch_and_prior_removal_are_explicit() -> None:
@@ -249,8 +229,6 @@ def test_quotient_mismatch_and_prior_removal_are_explicit() -> None:
 ####
 
 
-
-
 def test_coalescence_and_json_contract_round_trip(tmp_path: Path) -> None:
     references = [
         packet("A", (9.0, 1.0, 0.5), "source-A"),
@@ -264,8 +242,6 @@ def test_coalescence_and_json_contract_round_trip(tmp_path: Path) -> None:
     assert restored == references[0]
     assert (tmp_path / "packet.json").write_text(encoded, encoding="utf-8") > 0
 ####
-
-
 
 
 def test_packet_from_report_preserves_class_contenders() -> None:
@@ -290,5 +266,3 @@ def test_packet_from_report_preserves_class_contenders() -> None:
     assert packet_result.log_evidence["C1"] == pytest.approx(0.0)
     assert packet_result.excitation_rank == 3
 ####
-
-

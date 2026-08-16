@@ -39,8 +39,6 @@ def _truth() -> SyntheticConvention:
 ####
 
 
-
-
 def _config(*, rate_orders: tuple[str, ...] = ("rqp",)) -> InferenceConfig:
     return InferenceConfig(
         search_space=SearchSpace(
@@ -56,14 +54,10 @@ def _config(*, rate_orders: tuple[str, ...] = ("rqp",)) -> InferenceConfig:
 ####
 
 
-
-
 def _trajectory(*, scale: float = 0.8, count: int = 121) -> TrajectoryData:
     time_s = np.arange(count, dtype=np.float64) * 0.02
     return encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s, scale), _truth())
 ####
-
-
 
 
 def _streams(data: TrajectoryData) -> tuple[FloatArray, FloatArray, FloatArray]:
@@ -72,8 +66,6 @@ def _streams(data: TrajectoryData) -> tuple[FloatArray, FloatArray, FloatArray]:
     ####
     return data.orientation, data.rates, data.time_s
 ####
-
-
 
 
 @pytest.mark.parametrize("bad_value", (np.nan, np.inf, -np.inf))
@@ -94,8 +86,6 @@ def test_nonfinite_streams_are_rejected(bad_value: float) -> None:
 ####
 
 
-
-
 @pytest.mark.parametrize("bad_times", ((0.0, 0.1, 0.1), (0.0, 0.2, 0.1)))
 def test_nonincreasing_timestamps_are_rejected(bad_times: tuple[float, float, float]) -> None:
     data = _trajectory(count=3)
@@ -110,8 +100,6 @@ def test_nonincreasing_timestamps_are_rejected(bad_times: tuple[float, float, fl
         )
     ####
 ####
-
-
 
 
 def test_zero_norm_quaternions_are_rejected() -> None:
@@ -131,8 +119,6 @@ def test_zero_norm_quaternions_are_rejected() -> None:
 ####
 
 
-
-
 def test_zero_motion_reports_ambiguity_instead_of_confidence() -> None:
     time_s = np.arange(121, dtype=np.float64) * 0.02
     data = encode_synthetic_trajectory(time_s, np.zeros((time_s.size, 3)), _truth())
@@ -143,8 +129,6 @@ def test_zero_motion_reports_ambiguity_instead_of_confidence() -> None:
     assert report.diagnostics.confidence < 0.5
     assert report.diagnostics.warnings
 ####
-
-
 
 
 def test_single_axis_motion_reports_partial_excitation() -> None:
@@ -164,8 +148,6 @@ def test_single_axis_motion_reports_partial_excitation() -> None:
 ####
 
 
-
-
 def test_hard_aliasing_is_reported() -> None:
     time_s = np.arange(121, dtype=np.float64) * 0.02
     rates = np.tile(np.asarray((200.0, 0.0, 0.0)), (time_s.size, 1))
@@ -176,8 +158,6 @@ def test_hard_aliasing_is_reported() -> None:
     assert report.best.hard_alias_fraction > 0.0
     assert any("pi" in warning or "wrap" in warning for warning in report.diagnostics.warnings)
 ####
-
-
 
 
 def test_inference_rejects_too_few_samples() -> None:
@@ -194,8 +174,6 @@ def test_inference_rejects_too_few_samples() -> None:
 ####
 
 
-
-
 def test_missing_timestamps_use_explicit_scale_gauge_label() -> None:
     data = _trajectory()
     without_time = replace(data, time_s=None)
@@ -204,8 +182,6 @@ def test_missing_timestamps_use_explicit_scale_gauge_label() -> None:
 
     assert report.result_label.value == "scale-gauge"
 ####
-
-
 
 
 @pytest.mark.parametrize("quaternion_order", tuple(QuaternionOrder))
@@ -235,8 +211,6 @@ def test_quaternion_scalar_position_variants_recover_under_stress(
 ####
 
 
-
-
 @pytest.mark.parametrize("storage_dtype", (np.float32, np.float64))
 def test_float32_and_nonunit_quaternions_remain_numerically_stable(
     storage_dtype: type[np.floating],
@@ -258,8 +232,6 @@ def test_float32_and_nonunit_quaternions_remain_numerically_stable(
 ####
 
 
-
-
 def test_one_sample_rate_latency_is_measured_as_residual_degradation() -> None:
     data = _trajectory(count=161)
     _, rates, _ = _streams(data)
@@ -272,8 +244,6 @@ def test_one_sample_rate_latency_is_measured_as_residual_degradation() -> None:
     assert report.best.interval_rmse_rad > 1.0e-4
     assert report.best.interval_rmse_rad > clean.best.interval_rmse_rad * 100.0
 ####
-
-
 
 
 def test_slow_timestamp_drift_stays_valid_but_reduces_fit_quality() -> None:
@@ -292,8 +262,6 @@ def test_slow_timestamp_drift_stays_valid_but_reduces_fit_quality() -> None:
     assert np.isfinite(report.best.interval_rmse_rad)
     assert report.best.interval_rmse_rad > 1.0e-4
 ####
-
-
 
 
 def test_euler_branch_crossing_is_diagnosed_without_invalid_rotation_math() -> None:
@@ -334,5 +302,3 @@ def test_euler_branch_crossing_is_diagnosed_without_invalid_rotation_math() -> N
     assert np.isfinite(report.best.interval_rmse_rad)
     assert report.best.euler_singularity_margin is not None
 ####
-
-

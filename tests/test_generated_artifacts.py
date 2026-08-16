@@ -26,5 +26,3 @@ def test_checked_in_example_data_matches_generator(tmp_path: Path) -> None:
         assert generated.read_bytes() == expected.read_bytes(), relative_path
     ####
 ####
-
-

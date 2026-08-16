@@ -40,8 +40,6 @@ def _ambiguous_config() -> InferenceConfig:
 ####
 
 
-
-
 def _ambiguous_data() -> TrajectoryData:
     time_s = np.arange(61, dtype=np.float64) * 0.02
     truth = SyntheticConvention(
@@ -53,8 +51,6 @@ def _ambiguous_data() -> TrajectoryData:
     )
     return encode_synthetic_trajectory(time_s, np.zeros((time_s.size, 3)), truth)
 ####
-
-
 
 
 def test_domain_prior_abstains_when_no_contender_has_support() -> None:
@@ -76,8 +72,6 @@ def test_domain_prior_abstains_when_no_contender_has_support() -> None:
 ####
 
 
-
-
 def test_domain_prior_selects_only_from_evidence_contenders() -> None:
     data = _ambiguous_data()
     config = _ambiguous_config()
@@ -94,8 +88,6 @@ def test_domain_prior_selects_only_from_evidence_contenders() -> None:
     assert report.operational_reason == "domain-prior"
     assert report.domain_prior_supported_class_ids == (target,)
 ####
-
-
 
 
 def test_preference_profile_selects_representative_inside_exact_class() -> None:
@@ -122,8 +114,6 @@ def test_preference_profile_selects_representative_inside_exact_class() -> None:
     assert "sign=-1" in report.operational_hypothesis_id
     assert len(report.best.exact_equivalent_hypothesis_ids) > 1
 ####
-
-
 
 
 def test_preference_profile_json_round_trip_and_class_selection() -> None:
@@ -153,8 +143,6 @@ def test_preference_profile_json_round_trip_and_class_selection() -> None:
 ####
 
 
-
-
 def test_preference_profile_abstains_when_class_support_is_external() -> None:
     report = infer_conventions(
         _ambiguous_data(),
@@ -169,8 +157,6 @@ def test_preference_profile_abstains_when_class_support_is_external() -> None:
     assert report.preference_profile_supported_class_ids == ()
     assert report.operational_reason == "canonical-policy"
 ####
-
-
 
 
 def test_raw_excitation_diagnostic_survives_signed_channel_relabeling() -> None:
@@ -192,8 +178,6 @@ def test_raw_excitation_diagnostic_survives_signed_channel_relabeling() -> None:
 ####
 
 
-
-
 def test_exact_lower_bound_pruning_is_strict_and_separate_from_evidence() -> None:
     assert not should_prune_by_exact_lower_bound(1.0, 1.0)
     assert should_prune_by_exact_lower_bound(1.01, 1.0)
@@ -201,8 +185,6 @@ def test_exact_lower_bound_pruning_is_strict_and_separate_from_evidence() -> Non
         should_prune_by_exact_lower_bound(float("nan"), 1.0)
     ####
 ####
-
-
 
 
 def test_partial_streams_return_explicit_availability_labels() -> None:
@@ -227,5 +209,3 @@ def test_partial_streams_return_explicit_availability_labels() -> None:
     assert rate_report.result_label.value == "rate-non-ID"
     assert attitude_report.best.heuristic_features.classifier_probability is None
 ####
-
-

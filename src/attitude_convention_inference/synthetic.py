@@ -62,8 +62,6 @@ class SyntheticConvention:
 ####
 
 
-
-
 def integrate_attitude_trajectory(
     time_s: FloatArray,
     angular_rates_rad_s: FloatArray,
@@ -99,8 +97,6 @@ def integrate_attitude_trajectory(
     ####
     return _rotation_from_quat(stack(quaternions))
 ####
-
-
 
 
 def encode_synthetic_trajectory(
@@ -172,8 +168,6 @@ def encode_synthetic_trajectory(
 ####
 
 
-
-
 def rich_three_axis_rates(time_s: FloatArray, scale: float = 1.0) -> FloatArray:
     times = asarray(time_s, dtype=float64)
     return scale * column_stack(
@@ -184,5 +178,3 @@ def rich_three_axis_rates(time_s: FloatArray, scale: float = 1.0) -> FloatArray:
         )
     )
 ####
-
-

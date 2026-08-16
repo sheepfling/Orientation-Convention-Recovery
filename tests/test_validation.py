@@ -27,15 +27,11 @@ def test_rejects_nonincreasing_time() -> None:
 ####
 
 
-
-
 def test_rejects_invalid_rate_order() -> None:
     with pytest.raises(ValueError, match="p/q/r permutation"):
         SearchSpace(rate_orders=("xyz",))
     ####
 ####
-
-
 
 
 @pytest.mark.parametrize("order", ("xxy", "xyy", "xxxx", "xyw"))
@@ -44,8 +40,6 @@ def test_rejects_invalid_euler_order(order: str) -> None:
         SearchSpace(euler_orders=(order,))
     ####
 ####
-
-
 
 
 @pytest.mark.parametrize(
@@ -66,15 +60,11 @@ def test_rejects_nonfinite_inference_configuration(field: str) -> None:
 ####
 
 
-
-
 def test_rejects_nonfinite_sample_period_bounds() -> None:
     with pytest.raises(ValueError, match="finite"):
         InferenceConfig(inferred_sample_period_bounds_s=(1.0, math.inf))
     ####
 ####
-
-
 
 
 @pytest.mark.parametrize(
@@ -92,8 +82,6 @@ def test_rejects_invalid_evidence_configuration(field: str, value: float | int) 
 ####
 
 
-
-
 def test_model_validate_normalizes_external_config_values() -> None:
     config = InferenceConfig.model_validate(
         {"constraints": {"rate_frame": "body", "rate_order": "pqr"}}
@@ -103,5 +91,3 @@ def test_model_validate_normalizes_external_config_values() -> None:
     assert config.constraints.rate_frame == (RateFrame.BODY,)
     assert config.constraints.rate_order == ("pqr",)
 ####
-
-

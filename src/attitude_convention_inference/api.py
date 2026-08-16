@@ -83,8 +83,6 @@ def resolve_config(
 ####
 
 
-
-
 @overload
 def infer_conventions(
     orientation: TrajectoryData,
@@ -189,8 +187,6 @@ def infer_conventions(
 ####
 
 
-
-
 def infer_attitude_conventions(
     orientation: ArrayLike,
     rates: ArrayLike,
@@ -219,8 +215,6 @@ def infer_attitude_conventions(
         sample_period_s=sample_period_s,
     )
 ####
-
-
 
 
 def infer_csv(
@@ -268,8 +262,6 @@ def infer_csv(
 ####
 
 
-
-
 def inspect_csv(
     path: str | Path,
     *,
@@ -291,5 +283,3 @@ def inspect_csv(
         time_column=time_column,
     )
 ####
-
-

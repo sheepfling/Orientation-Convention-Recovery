@@ -41,13 +41,9 @@ def _from_euler(sequence: str, angles: FloatArray) -> Rotation:
 ####
 
 
-
-
 def _from_quat(quaternions: FloatArray) -> Rotation:
     return cast(Rotation, cast(Any, Rotation).from_quat(quaternions))
 ####
-
-
 
 
 def _from_rotvec(rotvecs: FloatArray) -> Rotation:
@@ -55,20 +51,14 @@ def _from_rotvec(rotvecs: FloatArray) -> Rotation:
 ####
 
 
-
-
 def _euler_values(rotation: Rotation, sequence: str) -> FloatArray:
     return np.asarray(cast(Any, rotation).as_euler(sequence, degrees=False), dtype=np.float64)
 ####
 
 
-
-
 def _quaternions(rotation: Rotation) -> FloatArray:
     return np.asarray(cast(Any, rotation).as_quat(), dtype=np.float64)
 ####
-
-
 
 
 def _euler_config(order: str) -> InferenceConfig:
@@ -85,8 +75,6 @@ def _euler_config(order: str) -> InferenceConfig:
         )
     )
 ####
-
-
 
 
 @pytest.mark.parametrize(("order", "mode"), PROPER_EULER_CASES)
@@ -114,8 +102,6 @@ def test_all_proper_euler_orders_and_modes_are_inference_candidates(
 ####
 
 
-
-
 @pytest.mark.parametrize(("order", "mode"), REMAINING_TAIT_BRYAN_CASES)
 def test_remaining_tait_bryan_orders_and_modes_are_inference_candidates(
     order: str,
@@ -139,8 +125,6 @@ def test_remaining_tait_bryan_orders_and_modes_are_inference_candidates(
     assert report.best.hypothesis.euler_mode is mode
     assert report.best.interval_rmse_rad < 1.0e-6
 ####
-
-
 
 
 def test_proper_euler_gimbal_lock_uses_sine_singularity() -> None:
@@ -171,8 +155,6 @@ def test_proper_euler_gimbal_lock_uses_sine_singularity() -> None:
 ####
 
 
-
-
 def test_euler_range_diagnostic_is_soft_and_preserves_rotation_validity() -> None:
     sample_count = 21
     data = TrajectoryData(
@@ -201,8 +183,6 @@ def test_euler_range_diagnostic_is_soft_and_preserves_rotation_validity() -> Non
     assert report.best.euler_singularity_margin is not None
     assert any("principal output ranges" in item for item in report.best.warnings)
 ####
-
-
 
 
 @pytest.mark.parametrize("unit", tuple(AngleUnit))
@@ -239,8 +219,6 @@ def test_all_supported_raw_euler_angle_units_decode_consistently(unit: AngleUnit
 ####
 
 
-
-
 def test_wrap_classifier_abstains_without_a_visible_crossing() -> None:
     sample_count = 21
     data = TrajectoryData(
@@ -268,8 +246,6 @@ def test_wrap_classifier_abstains_without_a_visible_crossing() -> None:
         WrapUnitStatus.UNIT_UNDETERMINED_BY_WRAP
     )
 ####
-
-
 
 
 def test_wrap_classifier_marks_a_visible_period_crossing_as_suggestive() -> None:
@@ -302,8 +278,6 @@ def test_wrap_classifier_marks_a_visible_period_crossing_as_suggestive() -> None
 ####
 
 
-
-
 def test_noise_process_estimator_recovers_scale_after_trim() -> None:
     rng = np.random.default_rng(7)
     residuals = rng.normal(0.0, 0.002, (1000, 3))
@@ -315,8 +289,6 @@ def test_noise_process_estimator_recovers_scale_after_trim() -> None:
     assert estimate.sigma_rad == pytest.approx(0.002, rel=0.12)
     assert abs(estimate.lag1_autocorrelation) < 0.10
 ####
-
-
 
 
 def _quaternion_config() -> InferenceConfig:
@@ -333,8 +305,6 @@ def _quaternion_config() -> InferenceConfig:
         evidence_stability_windows=3,
     )
 ####
-
-
 
 
 def test_estimates_rotation_noise_and_early_evidence() -> None:
@@ -380,8 +350,6 @@ def test_estimates_rotation_noise_and_early_evidence() -> None:
 ####
 
 
-
-
 def test_weak_motion_requires_the_full_file_without_separation() -> None:
     time_s = np.arange(161, dtype=np.float64) * 0.02
     truth = SyntheticConvention(
@@ -399,5 +367,3 @@ def test_weak_motion_requires_the_full_file_without_separation() -> None:
     assert report.diagnostics.evidence_intervals_used == data.sample_count - 1
     assert report.diagnostics.evidence_fraction == pytest.approx(1.0)
 ####
-
-

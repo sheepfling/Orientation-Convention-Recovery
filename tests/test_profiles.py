@@ -27,8 +27,6 @@ def test_neutral_profile_is_packaged_and_unconfigured() -> None:
 ####
 
 
-
-
 def test_curated_profile_is_packaged_with_inspectable_preferences() -> None:
     assert "common-engineering-v1" in available_preference_profiles()
 
@@ -41,15 +39,11 @@ def test_curated_profile_is_packaged_with_inspectable_preferences() -> None:
 ####
 
 
-
-
 def test_unknown_profile_has_actionable_error() -> None:
     with pytest.raises(ValueError, match="available profiles"):
         load_preference_profile("does-not-exist")
     ####
 ####
-
-
 
 
 def test_mapping_defaults_use_the_neutral_profile() -> None:
@@ -59,8 +53,6 @@ def test_mapping_defaults_use_the_neutral_profile() -> None:
     assert config.preference_profile.source == "package-default"
     assert not config.preference_profile.configured()
 ####
-
-
 
 
 def test_profile_composition_uses_weighted_geometric_preferences() -> None:

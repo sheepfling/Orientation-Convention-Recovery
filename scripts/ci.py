@@ -24,14 +24,10 @@ def _tool(name: str) -> str:
 ####
 
 
-
-
 def _run(command: list[str], label: str) -> None:
     print(f"\n== {label} ==")
     subprocess.run(command, cwd=ROOT, check=True)
 ####
-
-
 
 
 def run_pipeline(fix: bool) -> None:
@@ -79,8 +75,6 @@ def run_pipeline(fix: bool) -> None:
 ####
 
 
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -91,8 +85,6 @@ def main() -> None:
     args = parser.parse_args()
     run_pipeline(args.fix)
 ####
-
-
 
 
 if __name__ == "__main__":

@@ -48,8 +48,6 @@ def _write_z_rotation_csv(path: Path, sample_count: int = 21) -> None:
 ####
 
 
-
-
 def test_high_level_api_accepts_lists_and_mapping_constraints() -> None:
     orientation: list[list[float]] = []
     rates: list[list[float]] = []
@@ -81,8 +79,6 @@ def test_high_level_api_accepts_lists_and_mapping_constraints() -> None:
 ####
 
 
-
-
 def test_detect_csv_layout_from_common_columns(tmp_path: Path) -> None:
     source = tmp_path / "trajectory.csv"
     _write_z_rotation_csv(source)
@@ -94,8 +90,6 @@ def test_detect_csv_layout_from_common_columns(tmp_path: Path) -> None:
     assert layout.rate_columns == ("p", "q", "r")
     assert layout.time_column == "time_s"
 ####
-
-
 
 
 def test_detect_csv_layout_is_case_and_spacing_tolerant(tmp_path: Path) -> None:
@@ -116,8 +110,6 @@ def test_detect_csv_layout_is_case_and_spacing_tolerant(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_detect_csv_layout_rejects_multiple_rate_groups(tmp_path: Path) -> None:
     source = tmp_path / "trajectory.csv"
     source.write_text(
@@ -129,8 +121,6 @@ def test_detect_csv_layout_rejects_multiple_rate_groups(tmp_path: Path) -> None:
         detect_csv_layout(source)
     ####
 ####
-
-
 
 
 def test_infer_csv_uses_auto_detected_layout(tmp_path: Path) -> None:
@@ -150,8 +140,6 @@ def test_infer_csv_uses_auto_detected_layout(tmp_path: Path) -> None:
     assert report.hypothesis_count == 1
     assert report.best.interval_rmse_rad < 1.0e-10
 ####
-
-
 
 
 def test_cli_auto_detection_and_json_output(
@@ -184,8 +172,6 @@ def test_cli_auto_detection_and_json_output(
 ####
 
 
-
-
 def test_cli_inspect_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     source = tmp_path / "trajectory.csv"
     _write_z_rotation_csv(source)
@@ -195,8 +181,6 @@ def test_cli_inspect_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
     assert payload["orientation_columns"] == ["qx", "qy", "qz", "qw"]
     assert payload["time_column"] == "time_s"
 ####
-
-
 
 
 def test_python_module_entry_point(tmp_path: Path) -> None:
@@ -229,16 +213,12 @@ def test_python_module_entry_point(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_version_is_exported() -> None:
     from importlib.metadata import version
 
     assert __version__ == version("attitude-convention-inference")
     assert __version__
 ####
-
-
 
 
 def test_detect_csv_layout_for_euler_columns(tmp_path: Path) -> None:
@@ -256,8 +236,6 @@ def test_detect_csv_layout_for_euler_columns(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_negative_sample_period_override_is_rejected() -> None:
     with pytest.raises(ValueError, match="sample_period_s"):
         infer_attitude_conventions(
@@ -272,8 +250,6 @@ def test_negative_sample_period_override_is_rejected() -> None:
         )
     ####
 ####
-
-
 
 
 def test_distribution_exposes_matching_primary_command() -> None:
@@ -295,8 +271,6 @@ def test_distribution_exposes_matching_primary_command() -> None:
         "scipy>=1.13",
     ]
 ####
-
-
 
 
 def test_canonical_infer_conventions_accepts_arrays() -> None:
@@ -330,8 +304,6 @@ def test_canonical_infer_conventions_accepts_arrays() -> None:
 ####
 
 
-
-
 def test_runtime_models_use_pydantic() -> None:
     from attitude_convention_inference.fusion import EvidencePacket
     from attitude_convention_inference.models import InferenceConfig
@@ -339,5 +311,3 @@ def test_runtime_models_use_pydantic() -> None:
     assert InferenceConfig.model_json_schema()
     assert EvidencePacket.model_json_schema()
 ####
-
-

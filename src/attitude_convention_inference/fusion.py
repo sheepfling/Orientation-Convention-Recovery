@@ -77,8 +77,6 @@ class EvidenceSemantics(StrEnum):
 ####
 
 
-
-
 class FusionStatus(StrEnum):
     """Top-level status returned by the cohort service."""
 
@@ -87,8 +85,6 @@ class FusionStatus(StrEnum):
     COHORT_CONFLICT = "cohort-conflict"
     COHORT_ABSTAIN = "cohort-abstain"
 ####
-
-
 
 
 def _string_tuple(
@@ -100,8 +96,6 @@ def _string_tuple(
     ####
     return values
 ####
-
-
 
 
 def _mapping_of_floats(value: Mapping[Any, Any], name: str) -> dict[str, float]:
@@ -118,13 +112,9 @@ def _mapping_of_floats(value: Mapping[Any, Any], name: str) -> dict[str, float]:
 ####
 
 
-
-
 def _mapping_of_strings(value: Mapping[Any, Any], name: str) -> dict[str, str]:
     return {str(key): str(item) for key, item in value.items()}
 ####
-
-
 
 
 def _empty_float_mapping() -> dict[str, float]:
@@ -132,13 +122,9 @@ def _empty_float_mapping() -> dict[str, float]:
 ####
 
 
-
-
 def _empty_string_mapping() -> dict[str, str]:
     return {}
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,9 +145,6 @@ class CalibrationDescriptor(FrozenModel):
         ####
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,9 +180,6 @@ class LineageDescriptor(FrozenModel):
         ####
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -279,7 +259,6 @@ class EvidencePacket(FrozenModel):
         object.__setattr__(self, "warnings", _string_tuple(self.warnings, "warnings"))
     ####
 
-
     @property
     def probability_ready(self) -> bool:
         return (
@@ -292,22 +271,18 @@ class EvidencePacket(FrozenModel):
         )
     ####
 
-
     def evidence_vector(self) -> NDArray[float64]:
         return asarray([self.log_evidence[key] for key in self.class_ids], dtype=float64)
     ####
-
 
     def local_prior_vector(self) -> NDArray[float64]:
         return asarray([self.local_prior[key] for key in self.class_ids], dtype=float64)
     ####
 
-
     def local_posterior(self) -> dict[str, float]:
         posterior = _normalize_log_weights(log(self.local_prior_vector()) + self.evidence_vector())
         return _vector_to_mapping(self.class_ids, posterior)
     ####
-
 
     @classmethod
     def from_inference_report(
@@ -390,9 +365,6 @@ class EvidencePacket(FrozenModel):
 ####
 
 
-
-
-
 @dataclass(frozen=True, slots=True)
 class LogOddsExplanation(FrozenModel):
     """Pairwise local/cohort/fused log-odds decomposition."""
@@ -403,8 +375,6 @@ class LogOddsExplanation(FrozenModel):
     borrowed_prior_log_odds: float
     fused_log_odds: float
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -477,9 +447,6 @@ class CohortFusionResult(FrozenModel):
 ####
 
 
-
-
-
 def relative_log_evidence_from_posterior(
     posterior: Mapping[str, float],
     prior: Mapping[str, float],
@@ -496,8 +463,6 @@ def relative_log_evidence_from_posterior(
     log_evidence -= amax(log_evidence)
     return _vector_to_mapping(class_ids, log_evidence)
 ####
-
-
 
 
 def build_shared_prototype(
@@ -527,8 +492,6 @@ def build_shared_prototype(
 ####
 
 
-
-
 def coalesce_evidence_packets(
     reference_packets: Sequence[EvidencePacket],
     *,
@@ -545,8 +508,6 @@ def coalesce_evidence_packets(
         power_weights=power_weights,
     )
 ####
-
-
 
 
 def fuse_target_with_robust_borrowing(
@@ -675,8 +636,6 @@ def fuse_target_with_robust_borrowing(
 ####
 
 
-
-
 def _validate_compatibility(packets: Sequence[EvidencePacket]) -> tuple[str, ...]:
     if not packets:
         raise ValueError("at least one packet is required")
@@ -695,8 +654,6 @@ def _validate_compatibility(packets: Sequence[EvidencePacket]) -> tuple[str, ...
     ####
     return first.class_ids
 ####
-
-
 
 
 def _validate_lineage(packets: Sequence[EvidencePacket], *, strict: bool) -> None:
@@ -742,8 +699,6 @@ def _validate_lineage(packets: Sequence[EvidencePacket], *, strict: bool) -> Non
 ####
 
 
-
-
 def _resolve_baseline_prior(
     class_ids: Sequence[str], baseline_prior: Mapping[str, float] | None
 ) -> NDArray[float64]:
@@ -752,8 +707,6 @@ def _resolve_baseline_prior(
     ####
     return _validated_probability_vector(baseline_prior, class_ids, "baseline_prior")
 ####
-
-
 
 
 def _validated_probability_vector(
@@ -773,13 +726,9 @@ def _validated_probability_vector(
 ####
 
 
-
-
 def _mapping_to_vector(mapping: Mapping[str, float], class_ids: Sequence[str]) -> NDArray[float64]:
     return asarray([mapping[class_id] for class_id in class_ids], dtype=float64)
 ####
-
-
 
 
 def _vector_to_mapping(
@@ -787,8 +736,6 @@ def _vector_to_mapping(
 ) -> dict[str, float]:
     return {class_id: float(value) for class_id, value in zip(class_ids, vector, strict=True)}
 ####
-
-
 
 
 def _normalize_log_weights(log_weights: NDArray[float64]) -> NDArray[float64]:
@@ -801,8 +748,6 @@ def _normalize_log_weights(log_weights: NDArray[float64]) -> NDArray[float64]:
 ####
 
 
-
-
 def load_evidence_packet(path: str | Path) -> EvidencePacket:
     """Load and validate one packet JSON document."""
 
@@ -810,15 +755,11 @@ def load_evidence_packet(path: str | Path) -> EvidencePacket:
 ####
 
 
-
-
 def write_fusion_result(path: str | Path, result: CohortFusionResult) -> None:
     """Write one validated fusion product as stable JSON."""
 
     Path(path).write_text(result.model_dump_json(indent=2), encoding="utf-8")
 ####
-
-
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -835,8 +776,6 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 ####
 
 
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     result = fuse_target_with_robust_borrowing(
@@ -851,8 +790,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     write_fusion_result(args.output, result)
     return 0
 ####
-
-
 
 
 if __name__ == "__main__":

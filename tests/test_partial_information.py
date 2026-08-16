@@ -43,8 +43,6 @@ def _quaternion_data() -> tuple[np.ndarray, TrajectoryData]:
 ####
 
 
-
-
 def test_scalar_and_subset_constraints_are_accepted() -> None:
     config = InferenceConfig.model_validate(
         {
@@ -62,8 +60,6 @@ def test_scalar_and_subset_constraints_are_accepted() -> None:
 ####
 
 
-
-
 def test_constraints_intersect_legacy_search_space() -> None:
     config = InferenceConfig(
         search_space=SearchSpace(rate_orders=("pqr", "prq", "rqp")),
@@ -74,8 +70,6 @@ def test_constraints_intersect_legacy_search_space() -> None:
 ####
 
 
-
-
 def test_contradictory_constraint_is_rejected() -> None:
     with pytest.raises(ValueError, match="no overlap"):
         InferenceConfig(
@@ -84,8 +78,6 @@ def test_contradictory_constraint_is_rejected() -> None:
         )
     ####
 ####
-
-
 
 
 def test_partial_information_reduces_and_documents_hypothesis_space() -> None:
@@ -113,8 +105,6 @@ def test_partial_information_reduces_and_documents_hypothesis_space() -> None:
     assert assessments["rate_order"].status is DimensionStatus.INFERRED
     assert assessments["euler_order"].status is DimensionStatus.NOT_APPLICABLE
 ####
-
-
 
 
 def test_soft_prior_selects_tie_without_erasing_evidence_ambiguity() -> None:
@@ -159,8 +149,6 @@ def test_soft_prior_selects_tie_without_erasing_evidence_ambiguity() -> None:
 ####
 
 
-
-
 def test_prior_json_uses_relative_weights() -> None:
     config = InferenceConfig.model_validate(
         {
@@ -176,8 +164,6 @@ def test_prior_json_uses_relative_weights() -> None:
     assert config.priors.rate_frame[RateFrame.BODY] == 4.0
     assert config.priors.rate_order["pqr"] == 2.0
 ####
-
-
 
 
 def test_cli_convention_flags_lock_all_relevant_dimensions(tmp_path: Path) -> None:
@@ -246,5 +232,3 @@ def test_cli_convention_flags_lock_all_relevant_dimensions(tmp_path: Path) -> No
     assert payload["hypothesis_space"]["constrained_hypothesis_count"] == 1
     assert payload["diagnostics"]["dimension_assessments"]["rate_frame"]["status"] == "fixed"
 ####
-
-

@@ -43,15 +43,11 @@ def rotation_from_quat(
 ####
 
 
-
-
 def rotation_from_euler(sequence: str, angles: FloatArray) -> Rotation:
     """Construct a SciPy rotation from radians in the requested Euler sequence."""
 
     return cast(Rotation, cast(Any, Rotation).from_euler(sequence, angles, degrees=False))
 ####
-
-
 
 
 def rotation_from_rotvec(rotvecs: FloatArray) -> Rotation:
@@ -61,15 +57,11 @@ def rotation_from_rotvec(rotvecs: FloatArray) -> Rotation:
 ####
 
 
-
-
 def rotation_magnitudes(rotation: Rotation) -> FloatArray:
     """Return rotation magnitudes as a typed floating-point array."""
 
     return asarray(cast(Any, rotation).magnitude(), dtype=float64)
 ####
-
-
 
 
 def rotation_rotvecs(rotation: Rotation) -> FloatArray:
@@ -79,15 +71,11 @@ def rotation_rotvecs(rotation: Rotation) -> FloatArray:
 ####
 
 
-
-
 def rotation_quaternions(rotation: Rotation) -> FloatArray:
     """Return scalar-last quaternions as a typed floating-point array."""
 
     return asarray(cast(Any, rotation).as_quat(), dtype=float64)
 ####
-
-
 
 
 def trimmed_mean_square(values: FloatArray, trim_fraction: float) -> float:
@@ -101,8 +89,6 @@ def trimmed_mean_square(values: FloatArray, trim_fraction: float) -> float:
 ####
 
 
-
-
 def support_weights(criteria: FloatArray) -> FloatArray:
     """Convert criterion values into normalized, numerically stable weights."""
 
@@ -110,5 +96,3 @@ def support_weights(criteria: FloatArray) -> FloatArray:
     raw: FloatArray = exp(-0.5 * clip(criteria - minimum, 0.0, 1400.0))
     return asarray(raw / float(np_sum(raw)), dtype=float64)
 ####
-
-

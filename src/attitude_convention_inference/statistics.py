@@ -51,8 +51,6 @@ class ExcitationSummary:
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class RawExcitationSummary:
     """Eigenvalue summary of raw rate excitation before candidate decoding."""
@@ -63,8 +61,6 @@ class RawExcitationSummary:
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class NoiseProcessEstimate:
     """Robust residual scale and temporal-correlation estimates."""
@@ -73,8 +69,6 @@ class NoiseProcessEstimate:
     retained_count: int
     lag1_autocorrelation: float
 ####
-
-
 
 
 def effective_excitation_rank(
@@ -100,8 +94,6 @@ def effective_excitation_rank(
         singular_values=(float(padded[0]), float(padded[1]), float(padded[2])),
     )
 ####
-
-
 
 
 def raw_rate_excitation(
@@ -135,8 +127,6 @@ def raw_rate_excitation(
         weakest_axis_ratio=ratio,
     )
 ####
-
-
 
 
 def estimate_noise_process(
@@ -177,8 +167,6 @@ def estimate_noise_process(
 ####
 
 
-
-
 def fixed_noise_log_likelihood(
     interval_error_rotvecs: FloatArray,
     noise_sigma_rad: float,
@@ -193,5 +181,3 @@ def fixed_noise_log_likelihood(
     sum_squared_error = float(np_sum(square(interval_error_rotvecs)))
     return -0.5 * (sum_squared_error / variance + degrees_of_freedom * log(2.0 * pi * variance))
 ####
-
-

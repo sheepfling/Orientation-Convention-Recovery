@@ -80,14 +80,10 @@ class AttitudeRepresentation(StrEnum):
 ####
 
 
-
-
 class AttitudeDirection(StrEnum):
     BODY_TO_WORLD = "body_to_world"
     WORLD_TO_BODY = "world_to_body"
 ####
-
-
 
 
 class QuaternionOrder(StrEnum):
@@ -96,14 +92,10 @@ class QuaternionOrder(StrEnum):
 ####
 
 
-
-
 class EulerMode(StrEnum):
     INTRINSIC = "intrinsic"
     EXTRINSIC = "extrinsic"
 ####
-
-
 
 
 class AngleUnit(StrEnum):
@@ -112,8 +104,6 @@ class AngleUnit(StrEnum):
     TURNS = "turns"
     GRADS = "grads"
 ####
-
-
 
 
 def angle_unit_scale(unit: AngleUnit) -> float:
@@ -128,14 +118,10 @@ def angle_unit_scale(unit: AngleUnit) -> float:
 ####
 
 
-
-
 class RateFrame(StrEnum):
     BODY = "body"
     WORLD = "world"
 ####
-
-
 
 
 class RateUnit(StrEnum):
@@ -144,16 +130,12 @@ class RateUnit(StrEnum):
 ####
 
 
-
-
 class ConfidenceLabel(StrEnum):
     HIGH = "high"
     MODERATE = "moderate"
     LOW = "low"
     INDETERMINATE = "indeterminate"
 ####
-
-
 
 
 class ResultLabel(StrEnum):
@@ -169,15 +151,11 @@ class ResultLabel(StrEnum):
 ####
 
 
-
-
 class WrapUnitStatus(StrEnum):
     NOT_APPLICABLE = "not-applicable"
     UNIT_UNDETERMINED_BY_WRAP = "unit-undetermined-by-wrap"
     UNIT_SUGGESTED_BY_WRAP = "unit-suggested-by-wrap"
 ####
-
-
 
 
 class DimensionStatus(StrEnum):
@@ -188,8 +166,6 @@ class DimensionStatus(StrEnum):
 ####
 
 
-
-
 class FrozenModel:
     """Shared Pydantic-backed behavior for immutable domain dataclasses."""
 
@@ -197,7 +173,6 @@ class FrozenModel:
     def model_validate(cls: type[Self], value: Any) -> Self:
         return TypeAdapter(cls).validate_python(value)
     ####
-
 
     def model_dump(self, *, mode: Literal["python", "json"] = "python") -> dict[str, Any]:
         if mode not in ("python", "json"):
@@ -207,11 +182,9 @@ class FrozenModel:
         return cast(dict[str, Any], converted)
     ####
 
-
     def model_dump_json(self, *, indent: int | None = None) -> str:
         return TypeAdapter(type(self)).dump_json(self, indent=indent).decode("utf-8")
     ####
-
 
     @classmethod
     def model_json_schema(cls) -> dict[str, Any]:
@@ -220,14 +193,10 @@ class FrozenModel:
         return TypeAdapter(cls).json_schema()
     ####
 
-
     def model_copy(self: Self, *, update: Mapping[str, object] | None = None) -> Self:
         return cast(Self, replace(cast(Any, self), **dict(update or {})))
     ####
 ####
-
-
-
 
 
 def _as_tuple(value: T | Sequence[T] | set[T] | None) -> tuple[T, ...] | None:
@@ -244,13 +213,9 @@ def _as_tuple(value: T | Sequence[T] | set[T] | None) -> tuple[T, ...] | None:
 ####
 
 
-
-
 def _enum_value(enum_type: type[EnumT], value: EnumT | str) -> EnumT:
     return value if isinstance(value, enum_type) else enum_type(value)
 ####
-
-
 
 
 def _enum_tuple(
@@ -265,8 +230,6 @@ def _enum_tuple(
 ####
 
 
-
-
 def _validate_nonempty_unique(value: tuple[object, ...], label: str) -> None:
     if not value:
         raise ValueError(f"{label} may not be empty.")
@@ -275,8 +238,6 @@ def _validate_nonempty_unique(value: tuple[object, ...], label: str) -> None:
         raise ValueError(f"{label} may not contain duplicates.")
     ####
 ####
-
-
 
 
 def _normalize_euler_orders(value: Sequence[str]) -> tuple[str, ...]:
@@ -295,8 +256,6 @@ def _normalize_euler_orders(value: Sequence[str]) -> tuple[str, ...]:
 ####
 
 
-
-
 def _normalize_rate_orders(value: Sequence[str]) -> tuple[str, ...]:
     normalized = tuple(str(order).lower() for order in value)
     for order in normalized:
@@ -308,8 +267,6 @@ def _normalize_rate_orders(value: Sequence[str]) -> tuple[str, ...]:
 ####
 
 
-
-
 def _normalize_signs(value: Sequence[int | str]) -> tuple[Literal[-1, 1], ...]:
     signs = tuple(int(item) for item in value)
     for sign in signs:
@@ -319,8 +276,6 @@ def _normalize_signs(value: Sequence[int | str]) -> tuple[Literal[-1, 1], ...]:
     ####
     return cast(tuple[Literal[-1, 1], ...], signs)
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -369,7 +324,6 @@ class SearchSpace(FrozenModel):
         return cls(**payload)
     ####
 
-
     def __post_init__(self) -> None:
         for item in fields(self):
             _validate_nonempty_unique(tuple(getattr(self, item.name)), "Search-space fields")
@@ -391,9 +345,6 @@ class SearchSpace(FrozenModel):
         _normalize_signs(tuple(self.rate_signs))
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -448,7 +399,6 @@ class ConventionConstraints(FrozenModel):
         return cls(**payload)
     ####
 
-
     def __post_init__(self) -> None:
         for field_name in _CONSTRAINT_FIELDS:
             value = getattr(self, field_name)
@@ -457,7 +407,6 @@ class ConventionConstraints(FrozenModel):
             ####
         ####
     ####
-
 
     @staticmethod
     def _intersect_values(
@@ -477,7 +426,6 @@ class ConventionConstraints(FrozenModel):
         ####
         return result
     ####
-
 
     def apply(self, base: SearchSpace) -> SearchSpace:
         return SearchSpace(
@@ -529,7 +477,6 @@ class ConventionConstraints(FrozenModel):
         )
     ####
 
-
     def intersect(self, other: ConventionConstraints) -> ConventionConstraints:
         updates: dict[str, tuple[object, ...] | None] = {}
         for field_name in _CONSTRAINT_FIELDS:
@@ -555,9 +502,6 @@ class ConventionConstraints(FrozenModel):
 ####
 
 
-
-
-
 def _prior_mapping(
     value: Mapping[Any, Any] | None,
     *,
@@ -580,8 +524,6 @@ def _prior_mapping(
 ####
 
 
-
-
 def _validated_payload(cls: type[T], value: T | Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(value, cls):
         instance = cast(Any, value)
@@ -593,8 +535,6 @@ def _validated_payload(cls: type[T], value: T | Mapping[str, Any]) -> dict[str, 
     mapping = cast(Mapping[str, Any], value)
     return {key: item for key, item in mapping.items()}
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -647,14 +587,10 @@ class ConventionPriors(FrozenModel):
         return cls(**payload)
     ####
 
-
     def configured_dimensions(self) -> tuple[str, ...]:
         return tuple(field_name for field_name in _PRIOR_FIELDS if bool(getattr(self, field_name)))
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -693,7 +629,6 @@ class DomainPrior(FrozenModel):
         return cls(**payload)
     ####
 
-
     def __post_init__(self) -> None:
         if not isfinite(float(self.strength)) or self.strength <= 0.0:
             raise ValueError("Domain prior strength must be positive and finite.")
@@ -705,14 +640,10 @@ class DomainPrior(FrozenModel):
         ####
     ####
 
-
     def configured(self) -> bool:
         return bool(self.class_weights) or bool(self.context)
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -767,7 +698,6 @@ class PreferenceProfile(FrozenModel):
         return cls(**payload)
     ####
 
-
     def __post_init__(self) -> None:
         if not self.profile_id.strip():
             raise ValueError("Preference profile profile_id must not be empty.")
@@ -784,24 +714,18 @@ class PreferenceProfile(FrozenModel):
         ####
     ####
 
-
     def class_configured(self) -> bool:
         return bool(self.class_weights)
     ####
-
 
     def representative_configured(self) -> bool:
         return bool(self.representative_preferences.configured_dimensions())
     ####
 
-
     def configured(self) -> bool:
         return bool(self.context) or self.class_configured() or self.representative_configured()
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -871,7 +795,6 @@ class InferenceConfig(FrozenModel):
         ####
         return cls(**payload)
     ####
-
 
     def __post_init__(self) -> None:
         if self.sample_period_s is not None and (
@@ -972,14 +895,10 @@ class InferenceConfig(FrozenModel):
         self.constraints.apply(self.search_space)
     ####
 
-
     def resolved_search_space(self) -> SearchSpace:
         return self.constraints.apply(self.search_space)
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -1017,7 +936,6 @@ class ConventionHypothesis(FrozenModel):
         return cls(**payload)
     ####
 
-
     def __post_init__(self) -> None:
         if self.quaternion_order is not None and not isinstance(
             self.quaternion_order, QuaternionOrder
@@ -1039,7 +957,6 @@ class ConventionHypothesis(FrozenModel):
         ####
     ####
 
-
     def identifier(self) -> str:
         if self.quaternion_order is not None:
             attitude = f"quat:{self.quaternion_order}:{self.attitude_direction}"
@@ -1054,7 +971,6 @@ class ConventionHypothesis(FrozenModel):
             f"sign={self.rate_sign:+d}"
         )
     ####
-
 
     def structural_dual(self) -> Self:
         """Return the exact direction--frame--global-sign dual hypothesis."""
@@ -1074,16 +990,12 @@ class ConventionHypothesis(FrozenModel):
         )
     ####
 
-
     def structural_equivalence_id(self) -> str:
         """Stable identifier for the direction--frame--sign equivalence class."""
 
         return min(self.identifier(), self.structural_dual().identifier())
     ####
 ####
-
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -1097,8 +1009,6 @@ class LagMetric(FrozenModel):
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class ScaleRisk(FrozenModel):
     """Raw geometric losses for one overlapping window scale."""
@@ -1108,8 +1018,6 @@ class ScaleRisk(FrozenModel):
     untrimmed_mse_rad2: float
     weight: float
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -1135,8 +1043,6 @@ class HeuristicFeatures(FrozenModel):
     representation_feature_vector: Mapping[str, float] = field(default_factory=dict[str, float])
     classifier_probability: float | None = None
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -1185,8 +1091,6 @@ class CandidateResult(FrozenModel):
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class DimensionAssessment(FrozenModel):
     status: DimensionStatus
@@ -1196,8 +1100,6 @@ class DimensionAssessment(FrozenModel):
     posterior_near_tie_values: tuple[str, ...]
     relative_prior_weights: Mapping[str, float] | None = None
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -1210,8 +1112,6 @@ class HypothesisSpaceSummary(FrozenModel):
     not_applicable_dimensions: tuple[str, ...]
     relative_prior_weights: Mapping[str, Mapping[str, float]]
 ####
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -1252,8 +1152,6 @@ class OverallDiagnostics(FrozenModel):
 ####
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class InferenceReport(FrozenModel):
     representation: AttitudeRepresentation
@@ -1280,4 +1178,3 @@ class InferenceReport(FrozenModel):
     preference_profile_supported_class_ids: tuple[str, ...] = ()
     representative_selection_reason: str = "canonical-policy"
 ####
-

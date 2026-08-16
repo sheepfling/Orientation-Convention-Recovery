@@ -37,13 +37,9 @@ def _truth() -> SyntheticConvention:
 ####
 
 
-
-
 def _quaternions(rotation: Rotation) -> FloatArray:
     return np.asarray(cast(Any, rotation).as_quat(), dtype=np.float64)
 ####
-
-
 
 
 def _from_quat(quaternions: FloatArray) -> Rotation:
@@ -51,20 +47,14 @@ def _from_quat(quaternions: FloatArray) -> Rotation:
 ####
 
 
-
-
 def _from_rotvec(rotvecs: FloatArray) -> Rotation:
     return cast(Rotation, cast(Any, Rotation).from_rotvec(rotvecs))
 ####
 
 
-
-
 def _magnitudes(rotation: Rotation) -> FloatArray:
     return np.asarray(cast(Any, rotation).magnitude(), dtype=np.float64)
 ####
-
-
 
 
 def test_direction_frame_sign_dual_has_one_exact_data_class() -> None:
@@ -103,8 +93,6 @@ def test_direction_frame_sign_dual_has_one_exact_data_class() -> None:
         dual.hypothesis.identifier(),
     }
 ####
-
-
 
 
 def test_rate_unit_and_period_share_an_exact_gauge_without_timestamps() -> None:
@@ -150,8 +138,6 @@ def test_rate_unit_and_period_share_an_exact_gauge_without_timestamps() -> None:
 ####
 
 
-
-
 def test_quaternion_orthogonal_coordinate_map_preserves_intrinsic_distances() -> None:
     random_rotation = cast(Rotation, cast(Any, Rotation).random(24, random_state=9))
     quaternions = _quaternions(random_rotation)
@@ -169,8 +155,6 @@ def test_quaternion_orthogonal_coordinate_map_preserves_intrinsic_distances() ->
 
     assert transformed_distances == pytest.approx(original_distances, abs=1.0e-12)
 ####
-
-
 
 
 def test_canonical_tie_order_is_invariant_to_search_enumeration() -> None:
@@ -205,8 +189,6 @@ def test_canonical_tie_order_is_invariant_to_search_enumeration() -> None:
 ####
 
 
-
-
 @pytest.mark.parametrize("frame", tuple(RateFrame))
 def test_prefix_window_products_match_direct_noncommutative_products(frame: RateFrame) -> None:
     increments = _from_rotvec(
@@ -239,5 +221,3 @@ def test_prefix_window_products_match_direct_noncommutative_products(frame: Rate
         abs=1.0e-12,
     )
 ####
-
-

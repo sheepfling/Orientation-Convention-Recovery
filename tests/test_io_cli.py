@@ -31,8 +31,6 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
 ####
 
 
-
-
 def test_load_csv_quaternion(tmp_path: Path) -> None:
     source = tmp_path / "trajectory.csv"
     _write_csv(
@@ -60,8 +58,6 @@ def test_load_csv_quaternion(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_load_csv_rejects_missing_columns(tmp_path: Path) -> None:
     source = tmp_path / "trajectory.csv"
     _write_csv(source, [{"q0": 0, "q1": 0, "q2": 0, "q3": 1, "a": 0, "b": 0}])
@@ -76,8 +72,6 @@ def test_load_csv_rejects_missing_columns(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_load_csv_rejects_wrong_orientation_width(tmp_path: Path) -> None:
     source = tmp_path / "trajectory.csv"
     source.write_text("x,y,z,a,b,c\n0,0,0,0,0,0\n", encoding="utf-8")
@@ -90,8 +84,6 @@ def test_load_csv_rejects_wrong_orientation_width(tmp_path: Path) -> None:
         )
     ####
 ####
-
-
 
 
 def test_load_csv_reports_invalid_numeric_line(tmp_path: Path) -> None:
@@ -111,8 +103,6 @@ def test_load_csv_reports_invalid_numeric_line(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_load_config_round_trip(tmp_path: Path) -> None:
     expected = InferenceConfig(
         search_space=SearchSpace(
@@ -128,8 +118,6 @@ def test_load_config_round_trip(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_write_interval_diagnostics(tmp_path: Path) -> None:
     target = tmp_path / "details.csv"
     write_interval_diagnostics(
@@ -143,8 +131,6 @@ def test_write_interval_diagnostics(tmp_path: Path) -> None:
     assert len(rows) == 2
     assert rows[1]["near_alias"] == "True"
 ####
-
-
 
 
 def test_cli_writes_report_and_details(tmp_path: Path) -> None:
@@ -213,8 +199,6 @@ def test_cli_writes_report_and_details(tmp_path: Path) -> None:
 ####
 
 
-
-
 def test_cli_lists_and_inspects_packaged_profiles(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--list-profiles"]) == 0
     listing = capsys.readouterr().out
@@ -226,5 +210,3 @@ def test_cli_lists_and_inspects_packaged_profiles(capsys: pytest.CaptureFixture[
     assert inspected["profile_id"] == "common-engineering-v1"
     assert inspected["representative_preferences"]["quaternion_order"]["scalar_last"] == 2.0
 ####
-
-

@@ -37,13 +37,9 @@ def _truth() -> SyntheticConvention:
 ####
 
 
-
-
 def _quaternions(rotation: Rotation) -> FloatArray:
     return np.asarray(cast(Any, rotation).as_quat(), dtype=np.float64)
 ####
-
-
 
 
 def _from_quat(quaternions: FloatArray) -> Rotation:
@@ -51,13 +47,9 @@ def _from_quat(quaternions: FloatArray) -> Rotation:
 ####
 
 
-
-
 def _from_rotvec(rotvecs: FloatArray) -> Rotation:
     return cast(Rotation, cast(Any, Rotation).from_rotvec(rotvecs))
 ####
-
-
 
 
 def _config(*, trim_fraction: float = 0.02) -> InferenceConfig:
@@ -74,8 +66,6 @@ def _config(*, trim_fraction: float = 0.02) -> InferenceConfig:
         window_sizes=(1, 2, 4, 8),
     )
 ####
-
-
 
 
 def _base_data(*, seed: int = 20260801, sample_count: int = 161) -> TrajectoryData:
@@ -101,8 +91,6 @@ def _base_data(*, seed: int = 20260801, sample_count: int = 161) -> TrajectoryDa
 ####
 
 
-
-
 def test_stress_noise_and_sign_flips_recover_convention() -> None:
     report = infer_conventions(_base_data(), _config())
 
@@ -110,8 +98,6 @@ def test_stress_noise_and_sign_flips_recover_convention() -> None:
     assert report.best.hypothesis.rate_order == "rqp"
     assert report.best.interval_rmse_rad < 0.03
 ####
-
-
 
 
 def test_stress_timestamp_jitter_and_dropped_samples() -> None:
@@ -144,8 +130,6 @@ def test_stress_timestamp_jitter_and_dropped_samples() -> None:
 ####
 
 
-
-
 def test_stress_burst_outliers_are_trimmed() -> None:
     data = _base_data(seed=19)
     if data.orientation is None:
@@ -162,8 +146,6 @@ def test_stress_burst_outliers_are_trimmed() -> None:
     assert report.best.hypothesis.quaternion_order is QuaternionOrder.SCALAR_LAST
     assert report.best.interval_rmse_rad < 0.03
 ####
-
-
 
 
 @pytest.mark.parametrize(
@@ -188,5 +170,3 @@ def test_stress_excitation_extremes_reduce_confidence(
     ####
     assert report.diagnostics.confidence < 0.95
 ####
-
-

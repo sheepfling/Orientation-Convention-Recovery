@@ -299,13 +299,9 @@ def _write_json(path: Path, payload: Any) -> None:
 ####
 
 
-
-
 def _write_model(path: Path, model: Any) -> None:
     path.write_text(model.model_dump_json(indent=2) + "\n", encoding="utf-8")
 ####
-
-
 
 
 def _build_partial_config() -> InferenceConfig:
@@ -328,8 +324,6 @@ def _build_partial_config() -> InferenceConfig:
 ####
 
 
-
-
 def _build_preference_profile() -> PreferenceProfile:
     return PreferenceProfile(
         profile_id="robotics-stack-v1",
@@ -343,8 +337,6 @@ def _build_preference_profile() -> PreferenceProfile:
         strength=1.0,
     )
 ####
-
-
 
 
 def _write_synthetic_quaternion_csv(path: Path) -> None:
@@ -366,8 +358,6 @@ def _write_synthetic_quaternion_csv(path: Path) -> None:
         ####
     ####
 ####
-
-
 
 
 def _build_packet(
@@ -396,8 +386,6 @@ def _build_packet(
 ####
 
 
-
-
 def _write_cohort_fusion_examples(example_dir: Path) -> None:
     packet_a = _build_packet("A", (9.0, 1.0, 0.5), "source-A")
     packet_b = _build_packet("B", (6.0, 1.0, 0.5), "source-B")
@@ -413,8 +401,6 @@ def _write_cohort_fusion_examples(example_dir: Path) -> None:
     )
     _write_model(example_dir / "fusion_result.json", result)
 ####
-
-
 
 
 def generate_examples(root: Path) -> None:
@@ -451,8 +437,6 @@ def generate_examples(root: Path) -> None:
     _write_json(cohort_fusion / "orientation-convention-domain-priors.json", DOMAIN_PRIOR_DOCUMENT)
     _write_cohort_fusion_examples(cohort_fusion)
 ####
-
-
 
 
 if __name__ == "__main__":

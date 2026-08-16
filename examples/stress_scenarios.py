@@ -67,13 +67,9 @@ class StressScenario:
 ####
 
 
-
-
 def _quaternions(rotation: Rotation) -> NDArray[float64]:
     return asarray(cast(Any, rotation).as_quat(), dtype=float64)
 ####
-
-
 
 
 def _rotation_from_quat(quaternions: NDArray[float64]) -> Rotation:
@@ -81,13 +77,9 @@ def _rotation_from_quat(quaternions: NDArray[float64]) -> Rotation:
 ####
 
 
-
-
 def _rotation_from_rotvec(rotvecs: NDArray[float64]) -> Rotation:
     return cast(Rotation, cast(Any, Rotation).from_rotvec(rotvecs))
 ####
-
-
 
 
 def _config(trim_fraction: float = 0.02) -> InferenceConfig:
@@ -103,8 +95,6 @@ def _config(trim_fraction: float = 0.02) -> InferenceConfig:
         trim_fraction=trim_fraction,
     )
 ####
-
-
 
 
 def _clean(seed: int, count: int) -> TrajectoryData:
@@ -126,8 +116,6 @@ def _clean(seed: int, count: int) -> TrajectoryData:
         rates=data.rates + rng.normal(0.0, 0.012, data.rates.shape),
     )
 ####
-
-
 
 
 def _scenarios(seed: int) -> dict[str, StressScenario]:
@@ -193,8 +181,6 @@ def _scenarios(seed: int) -> dict[str, StressScenario]:
 ####
 
 
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=20260801)
@@ -244,8 +230,6 @@ def main() -> int:
     ####
     return int(failures)
 ####
-
-
 
 
 if __name__ == "__main__":
