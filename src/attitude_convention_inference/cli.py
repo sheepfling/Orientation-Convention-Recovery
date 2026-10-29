@@ -237,7 +237,7 @@ def _print_profile_catalog(profiles: Sequence[PreferenceProfile]) -> None:
         status = "configured" if profile.configured() else "neutral"
         print(f"- {profile.profile_id} [{status}] source={profile.source or '<unspecified>'}")
         if profile.context:
-            print(f"  context={json.dumps(profile.context, sort_keys=True)}")
+            print(f"  context={json.dumps(dict(profile.context), sort_keys=True)}")
         ####
     ####
 ####

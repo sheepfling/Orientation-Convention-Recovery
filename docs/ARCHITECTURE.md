@@ -27,6 +27,7 @@ coercion -> models -> hypotheses
 | Module          | Responsibility                                                                                                  | Must not own                          |
 |-----------------|-----------------------------------------------------------------------------------------------------------------|---------------------------------------|
 | `models.py`     | Typed domain contracts, validation, and serialized report models                                                | Numerical scoring or file I/O         |
+| `immutable.py`  | Copied read-only mappings with Pydantic-compatible serialization                                                | Domain-specific validation            |
 | `coercion.py`   | Mapping/array-facing input coercion for the convenience API                                                     | Convention search or trajectory math  |
 | `hypotheses.py` | Search dimensions and normalized hypothesis generation                                                          | Data-dependent evidence               |
 | `core.py`       | Trajectory validation, convention decoding, interval integration, and window composition                        | Prior policy and report selection     |
@@ -57,6 +58,12 @@ connections for structural duals and clock-scale gauges. Prefix evidence uses
 cumulative residual energy under one fixed noise scale; this preserves the
 documented fixed-noise likelihood contrast while avoiding repeated rescoring of
 each earlier interval.
+
+Frozen configuration, profile, packet, and report models copy their mapping fields
+into read-only views, including the inner maps in a hypothesis-space summary.
+`immutable.py` supplies the serializer that converts those views back to ordinary
+JSON objects, so `model_dump_json()` and generated validation schemas stay usable.
+Callers can edit a dumped dictionary without changing the model it came from.
 
 Normal inference retains a candidate's result and residual rotation vectors, but
 not its decoded rates, interval durations, predicted/observed rotations, or path

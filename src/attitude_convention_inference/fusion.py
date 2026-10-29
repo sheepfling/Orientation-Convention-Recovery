@@ -44,6 +44,7 @@ from numpy import (
 from numpy.typing import NDArray
 from pydantic.dataclasses import dataclass
 
+from .immutable import ReadOnlyMapping, freeze_mapping
 from .models import FrozenModel
 
 __all__ = [
@@ -190,13 +191,13 @@ class EvidencePacket(FrozenModel):
     packet_id: str = ""
     quotient_space_id: str = ""
     class_ids: tuple[str, ...] = ()
-    log_evidence: Mapping[str, float] = field(default_factory=_empty_float_mapping)
-    local_prior: Mapping[str, float] = field(default_factory=_empty_float_mapping)
+    log_evidence: ReadOnlyMapping[str, float] = field(default_factory=_empty_float_mapping)
+    local_prior: ReadOnlyMapping[str, float] = field(default_factory=_empty_float_mapping)
     contender_set: tuple[str, ...] = ()
     evidence_semantics: EvidenceSemantics = EvidenceSemantics.UNCALIBRATED_RISK
     calibration: CalibrationDescriptor = field(default_factory=CalibrationDescriptor)
     lineage: LineageDescriptor = field(default_factory=LineageDescriptor)
-    provenance: Mapping[str, str] = field(default_factory=_empty_string_mapping)
+    provenance: ReadOnlyMapping[str, str] = field(default_factory=_empty_string_mapping)
     hard_anchors: tuple[str, ...] = ()
     excitation_rank: int | None = None
     excitation_eigenvalues: tuple[float, ...] = ()
@@ -247,13 +248,17 @@ class EvidencePacket(FrozenModel):
             lineage = LineageDescriptor.model_validate(lineage)
         ####
         object.__setattr__(self, "class_ids", class_ids)
-        object.__setattr__(self, "log_evidence", log_evidence)
-        object.__setattr__(self, "local_prior", local_prior)
+        object.__setattr__(self, "log_evidence", freeze_mapping(log_evidence))
+        object.__setattr__(self, "local_prior", freeze_mapping(local_prior))
         object.__setattr__(self, "contender_set", contender_set)
         object.__setattr__(self, "evidence_semantics", EvidenceSemantics(self.evidence_semantics))
         object.__setattr__(self, "calibration", calibration)
         object.__setattr__(self, "lineage", lineage)
-        object.__setattr__(self, "provenance", _mapping_of_strings(self.provenance, "provenance"))
+        object.__setattr__(
+            self,
+            "provenance",
+            freeze_mapping(_mapping_of_strings(self.provenance, "provenance")),
+        )
         object.__setattr__(self, "hard_anchors", _string_tuple(self.hard_anchors, "hard_anchors"))
         object.__setattr__(self, "excitation_eigenvalues", eigenvalues)
         object.__setattr__(self, "warnings", _string_tuple(self.warnings, "warnings"))
@@ -386,10 +391,10 @@ class CohortFusionResult(FrozenModel):
     quotient_space_id: str
     class_ids: tuple[str, ...]
     model_name: str = "robust-sharedness-mixture"
-    local_posterior: Mapping[str, float] = field(default_factory=_empty_float_mapping)
-    prototype_posterior: Mapping[str, float] = field(default_factory=_empty_float_mapping)
-    borrowed_prior: Mapping[str, float] = field(default_factory=_empty_float_mapping)
-    fused_posterior: Mapping[str, float] = field(default_factory=_empty_float_mapping)
+    local_posterior: ReadOnlyMapping[str, float] = field(default_factory=_empty_float_mapping)
+    prototype_posterior: ReadOnlyMapping[str, float] = field(default_factory=_empty_float_mapping)
+    borrowed_prior: ReadOnlyMapping[str, float] = field(default_factory=_empty_float_mapping)
+    fused_posterior: ReadOnlyMapping[str, float] = field(default_factory=_empty_float_mapping)
     fused_contender_set: tuple[str, ...] = ()
     prior_sharedness: float = 0.0
     posterior_sharedness: float = 0.0
@@ -411,7 +416,7 @@ class CohortFusionResult(FrozenModel):
             if set(mapping) != set(class_ids):
                 raise ValueError(f"{name} keys must exactly match class_ids")
             ####
-            object.__setattr__(self, name, mapping)
+            object.__setattr__(self, name, freeze_mapping(mapping))
         ####
         object.__setattr__(self, "class_ids", class_ids)
         object.__setattr__(

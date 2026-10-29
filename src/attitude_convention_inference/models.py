@@ -11,6 +11,8 @@ from typing import Any, Literal, Self, TypeVar, cast
 from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass
 
+from .immutable import ReadOnlyMapping, freeze_mapping, freeze_nested_mapping
+
 __all__ = [
     "AngleUnit",
     "AttitudeDirection",
@@ -541,25 +543,36 @@ def _validated_payload(cls: type[T], value: T | Mapping[str, Any]) -> dict[str, 
 class ConventionPriors(FrozenModel):
     """Relative soft-prior weights; missing values have neutral weight ``1.0``."""
 
-    attitude_direction: dict[AttitudeDirection | str, float] = field(
+    attitude_direction: ReadOnlyMapping[AttitudeDirection | str, float] = field(
         default_factory=dict[AttitudeDirection | str, float]
     )
-    quaternion_order: dict[QuaternionOrder | str, float] = field(
+    quaternion_order: ReadOnlyMapping[QuaternionOrder | str, float] = field(
         default_factory=dict[QuaternionOrder | str, float]
     )
-    euler_order: dict[str, float] = field(default_factory=dict[str, float])
-    euler_mode: dict[EulerMode | str, float] = field(default_factory=dict[EulerMode | str, float])
-    angle_unit: dict[AngleUnit | str, float] = field(default_factory=dict[AngleUnit | str, float])
-    rate_frame: dict[RateFrame | str, float] = field(default_factory=dict[RateFrame | str, float])
-    rate_order: dict[str, float] = field(default_factory=dict[str, float])
-    rate_unit: dict[RateUnit | str, float] = field(default_factory=dict[RateUnit | str, float])
-    rate_sign: dict[Literal[-1, 1] | str, float] = field(
+    euler_order: ReadOnlyMapping[str, float] = field(default_factory=dict[str, float])
+    euler_mode: ReadOnlyMapping[EulerMode | str, float] = field(
+        default_factory=dict[EulerMode | str, float]
+    )
+    angle_unit: ReadOnlyMapping[AngleUnit | str, float] = field(
+        default_factory=dict[AngleUnit | str, float]
+    )
+    rate_frame: ReadOnlyMapping[RateFrame | str, float] = field(
+        default_factory=dict[RateFrame | str, float]
+    )
+    rate_order: ReadOnlyMapping[str, float] = field(default_factory=dict[str, float])
+    rate_unit: ReadOnlyMapping[RateUnit | str, float] = field(
+        default_factory=dict[RateUnit | str, float]
+    )
+    rate_sign: ReadOnlyMapping[Literal[-1, 1] | str, float] = field(
         default_factory=dict[Literal[-1, 1] | str, float]
     )
 
     @classmethod
     def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        payload = _validated_payload(cls, value)
+        return cls(**_validated_payload(cls, value))
+    ####
+
+    def __post_init__(self) -> None:
         converters: tuple[tuple[str, Callable[[Any], Any], str], ...] = (
             (
                 "attitude_direction",
@@ -580,11 +593,10 @@ class ConventionPriors(FrozenModel):
             ("rate_sign", lambda item: _normalize_signs((cast(int | str, item),))[0], "rate_sign"),
         )
         for name, converter, label in converters:
-            if payload.get(name) is not None:
-                payload[name] = _prior_mapping(payload[name], key_converter=converter, label=label)
-            ####
+            weights = cast(Mapping[Any, Any], getattr(self, name))
+            normalized = _prior_mapping(weights, key_converter=converter, label=label)
+            object.__setattr__(self, name, freeze_mapping(normalized))
         ####
-        return cls(**payload)
     ####
 
     def configured_dimensions(self) -> tuple[str, ...]:
@@ -597,8 +609,8 @@ class ConventionPriors(FrozenModel):
 class DomainPrior(FrozenModel):
     """Class-level provenance prior applied only after trajectory contenders exist."""
 
-    class_weights: dict[str, float] = field(default_factory=dict[str, float])
-    context: dict[str, str] = field(default_factory=dict[str, str])
+    class_weights: ReadOnlyMapping[str, float] = field(default_factory=dict[str, float])
+    context: ReadOnlyMapping[str, str] = field(default_factory=dict[str, str])
     strength: float = 1.0
 
     @classmethod
@@ -638,6 +650,8 @@ class DomainPrior(FrozenModel):
                 raise ValueError("Domain prior weights must be finite and nonnegative.")
             ####
         ####
+        object.__setattr__(self, "class_weights", freeze_mapping(self.class_weights))
+        object.__setattr__(self, "context", freeze_mapping(self.context))
     ####
 
     def configured(self) -> bool:
@@ -658,8 +672,8 @@ class PreferenceProfile(FrozenModel):
 
     profile_id: str = "neutral-v1"
     source: str = "package-default"
-    context: dict[str, str] = field(default_factory=dict[str, str])
-    class_weights: dict[str, float] = field(default_factory=dict[str, float])
+    context: ReadOnlyMapping[str, str] = field(default_factory=dict[str, str])
+    class_weights: ReadOnlyMapping[str, float] = field(default_factory=dict[str, float])
     representative_preferences: ConventionPriors = field(default_factory=ConventionPriors)
     strength: float = 1.0
 
@@ -705,6 +719,11 @@ class PreferenceProfile(FrozenModel):
         if not isfinite(float(self.strength)) or self.strength <= 0.0:
             raise ValueError("Preference profile strength must be positive and finite.")
         ####
+        for weight in self.class_weights.values():
+            if not isfinite(float(weight)) or float(weight) < 0.0:
+                raise ValueError("Preference profile class weights must be finite and nonnegative.")
+            ####
+        ####
         if not isinstance(cast(Any, self.representative_preferences), ConventionPriors):
             object.__setattr__(
                 self,
@@ -712,6 +731,8 @@ class PreferenceProfile(FrozenModel):
                 ConventionPriors.model_validate(self.representative_preferences),
             )
         ####
+        object.__setattr__(self, "context", freeze_mapping(self.context))
+        object.__setattr__(self, "class_weights", freeze_mapping(self.class_weights))
     ####
 
     def class_configured(self) -> bool:
@@ -915,7 +936,10 @@ class ConventionHypothesis(FrozenModel):
 
     @classmethod
     def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        payload = _validated_payload(cls, value)
+        return cls(**_validated_payload(cls, value))
+    ####
+
+    def __post_init__(self) -> None:
         for name, enum_type in (
             ("attitude_direction", AttitudeDirection),
             ("rate_frame", RateFrame),
@@ -924,23 +948,15 @@ class ConventionHypothesis(FrozenModel):
             ("euler_mode", EulerMode),
             ("angle_unit", AngleUnit),
         ):
-            if payload.get(name) is not None:
-                payload[name] = _enum_value(enum_type, payload[name])
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(self, name, _enum_value(enum_type, value))
             ####
         ####
-        payload["rate_order"] = _normalize_rate_orders((payload["rate_order"],))[0]
-        payload["rate_sign"] = _normalize_signs((payload.get("rate_sign", 1),))[0]
-        if payload.get("euler_order") is not None:
-            payload["euler_order"] = _normalize_euler_orders((payload["euler_order"],))[0]
-        ####
-        return cls(**payload)
-    ####
-
-    def __post_init__(self) -> None:
-        if self.quaternion_order is not None and not isinstance(
-            self.quaternion_order, QuaternionOrder
-        ):
-            raise TypeError("quaternion_order must be a QuaternionOrder.")
+        object.__setattr__(self, "rate_order", _normalize_rate_orders((self.rate_order,))[0])
+        object.__setattr__(self, "rate_sign", _normalize_signs((self.rate_sign,))[0])
+        if self.euler_order is not None:
+            object.__setattr__(self, "euler_order", _normalize_euler_orders((self.euler_order,))[0])
         ####
 
         quaternion = self.quaternion_order is not None
@@ -1040,8 +1056,18 @@ class HeuristicFeatures(FrozenModel):
     inferred_wrap_count: int = 0
     wrap_unit_status: WrapUnitStatus = WrapUnitStatus.NOT_APPLICABLE
     representation_score: float = 0.0
-    representation_feature_vector: Mapping[str, float] = field(default_factory=dict[str, float])
+    representation_feature_vector: ReadOnlyMapping[str, float] = field(
+        default_factory=dict[str, float]
+    )
     classifier_probability: float | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "representation_feature_vector",
+            freeze_mapping(self.representation_feature_vector),
+        )
+    ####
 ####
 
 
@@ -1098,7 +1124,15 @@ class DimensionAssessment(FrozenModel):
     allowed_values: tuple[str, ...]
     evidence_near_tie_values: tuple[str, ...]
     posterior_near_tie_values: tuple[str, ...]
-    relative_prior_weights: Mapping[str, float] | None = None
+    relative_prior_weights: ReadOnlyMapping[str, float] | None = None
+
+    def __post_init__(self) -> None:
+        if self.relative_prior_weights is not None:
+            object.__setattr__(
+                self, "relative_prior_weights", freeze_mapping(self.relative_prior_weights)
+            )
+        ####
+    ####
 ####
 
 
@@ -1107,10 +1141,18 @@ class HypothesisSpaceSummary(FrozenModel):
     base_hypothesis_count: int
     constrained_hypothesis_count: int
     reduction_fraction: float
-    fixed_dimensions: Mapping[str, str]
-    searched_dimensions: Mapping[str, tuple[str, ...]]
+    fixed_dimensions: ReadOnlyMapping[str, str]
+    searched_dimensions: ReadOnlyMapping[str, tuple[str, ...]]
     not_applicable_dimensions: tuple[str, ...]
-    relative_prior_weights: Mapping[str, Mapping[str, float]]
+    relative_prior_weights: ReadOnlyMapping[str, ReadOnlyMapping[str, float]]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "fixed_dimensions", freeze_mapping(self.fixed_dimensions))
+        object.__setattr__(self, "searched_dimensions", freeze_mapping(self.searched_dimensions))
+        object.__setattr__(
+            self, "relative_prior_weights", freeze_nested_mapping(self.relative_prior_weights)
+        )
+    ####
 ####
 
 
@@ -1122,11 +1164,11 @@ class OverallDiagnostics(FrozenModel):
     best_data_relative_support: float
     near_tie_count: int
     near_tie_hypothesis_ids: tuple[str, ...]
-    unresolved_dimensions: Mapping[str, tuple[str, ...]]
+    unresolved_dimensions: ReadOnlyMapping[str, tuple[str, ...]]
     posterior_near_tie_count: int
     posterior_near_tie_hypothesis_ids: tuple[str, ...]
-    posterior_unresolved_dimensions: Mapping[str, tuple[str, ...]]
-    dimension_assessments: Mapping[str, DimensionAssessment]
+    posterior_unresolved_dimensions: ReadOnlyMapping[str, tuple[str, ...]]
+    dimension_assessments: ReadOnlyMapping[str, DimensionAssessment]
     effective_excitation_rank: float
     excitation_singular_values: tuple[float, float, float]
     total_observed_motion_rad: float
@@ -1149,6 +1191,20 @@ class OverallDiagnostics(FrozenModel):
     raw_excitation_rank: int = 0
     raw_excitation_eigenvalues: tuple[float, float, float] = (0.0, 0.0, 0.0)
     raw_excitation_condition_ratio: float = 0.0
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "unresolved_dimensions", freeze_mapping(self.unresolved_dimensions)
+        )
+        object.__setattr__(
+            self,
+            "posterior_unresolved_dimensions",
+            freeze_mapping(self.posterior_unresolved_dimensions),
+        )
+        object.__setattr__(
+            self, "dimension_assessments", freeze_mapping(self.dimension_assessments)
+        )
+    ####
 ####
 
 

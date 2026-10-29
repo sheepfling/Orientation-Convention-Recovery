@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Made nested maps in frozen configuration, profile, packet, and report models
+  read-only snapshots without changing Pydantic JSON output; normalized nested
+  hypotheses and prior keys through every construction path.
 - Reduced retained per-candidate diagnostic arrays, added a repeatable inference
   benchmark, and extended strict Pyright coverage to development scripts.
 - Made the auto-fix sequence idempotent by stripping scope markers before Ruff formatting,

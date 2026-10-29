@@ -32,10 +32,7 @@ implementation consistency, not recovery accuracy on outside data.
 1. Extend the [initial performance baseline](PERFORMANCE.md) to larger logs,
    Euler searches, process RSS, and cold starts. Keep the per-candidate score
    storage compact and avoid promising long-log support until measured.
-2. Review nested mutability in frozen configuration, profile, packet, and report
-   models. Preserve Pydantic serialization while preventing caller mutations
-   from changing a previously validated result.
-3. Split the large `models.py` and `inference.py` modules along the architecture
+2. Split the large `models.py` and `inference.py` modules along the architecture
    spine, with stable public imports and focused tests for each moved contract.
-4. Confirm the release matrix passes on GitHub, then test an actual `0.0.1`
+3. Confirm the release matrix passes on GitHub, then test an actual `0.0.1`
    prerelease artifact on TestPyPI before a public package release.

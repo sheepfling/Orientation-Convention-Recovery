@@ -170,6 +170,12 @@ print(report.diagnostics.model_dump_json(indent=2))
 ####
 ```
 
+Validated trajectory arrays and the mapping fields inside configuration, profile,
+packet, and report models are copied into read-only snapshots. Changing an input
+dictionary after construction cannot change a result. Use `model_copy(update=...)`
+or `model_validate(...)` to create a revised model; `model_dump(mode="python")`
+returns detached dictionaries for editing or serialization.
+
 The same function accepts explicit model objects:
 
 ```python
