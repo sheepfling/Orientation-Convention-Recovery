@@ -25,6 +25,10 @@ from attitude_convention_inference import (
 )
 from attitude_convention_inference.core import FloatArray
 from attitude_convention_inference.inference import estimate_noise_process
+from attitude_convention_inference.statistics import (
+    fixed_noise_log_likelihood,
+    log_likelihood_advantage_by_prefix,
+)
 from attitude_convention_inference.synthetic import (
     SyntheticConvention,
     encode_synthetic_trajectory,
@@ -288,6 +292,26 @@ def test_noise_process_estimator_recovers_scale_after_trim() -> None:
     assert estimate.retained_count == 980
     assert estimate.sigma_rad == pytest.approx(0.002, rel=0.12)
     assert abs(estimate.lag1_autocorrelation) < 0.10
+####
+
+
+def test_prefix_evidence_matches_direct_fixed_noise_likelihood() -> None:
+    rng = np.random.default_rng(41)
+    winner = np.asarray(rng.normal(0.0, 0.002, (37, 3)), dtype=np.float64)
+    competitors = (
+        np.asarray(rng.normal(0.0, 0.003, (37, 3)), dtype=np.float64),
+        np.asarray(rng.normal(0.0, 0.005, (37, 3)), dtype=np.float64),
+    )
+    sigma = 0.0025
+
+    advantages = log_likelihood_advantage_by_prefix(winner, competitors, sigma)
+
+    for prefix in range(1, len(winner) + 1):
+        expected = fixed_noise_log_likelihood(winner[:prefix], sigma) - max(
+            fixed_noise_log_likelihood(item[:prefix], sigma) for item in competitors
+        )
+        assert float(advantages[prefix - 1]) == pytest.approx(expected, abs=1.0e-9)
+    ####
 ####
 
 

@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.0.1
+## Unreleased
+
+- Made the auto-fix sequence idempotent by stripping scope markers before Ruff formatting,
+  and made CI check Ruff formatting on a temporary marker-free copy.
+- Added independent-corpus evaluation and a wheel-from-sdist distribution smoke test.
+- Added an analytic synthetic validation corpus generator with three labeled cases.
+- Added Windows to the Python 3.11/3.12 CI matrix, sped up exact-class grouping
+  and evidence-prefix evaluation, and made trajectory input buffers read-only copies.
+- Separated source-checkout version testing from installed-wheel metadata testing.
+
+## 0.0.1a0
 
 - Added Pydantic back as a runtime dependency for dataclass validation and JSON Schema generation.
 - Kept the configuration and report models as frozen, slotted Pydantic dataclasses.
@@ -11,7 +21,11 @@
 - Kept runtime dependencies limited to NumPy, Pydantic, and SciPy.
 - Expanded the regression suite to 68 tests.
 
-## 0.3.0
+## Earlier development work
+
+The following were internal milestones before the `0.0.1a0` tag, not release versions.
+
+### Library and CLI
 
 - Made the project a first-class library and command-line application from one package.
 - Added the `attitude-convention-inference` executable while retaining `attitude-conventions`.
@@ -24,7 +38,7 @@
 - Added package version export and PEP 561 `py.typed` marker.
 - Expanded the test suite from 54 to 63 tests.
 
-## 0.2.0
+### Constraints and priors
 
 - Added concise hard constraints for fixed or allowed-subset convention knowledge.
 - Added relative soft-prior weights without removing evidence-only ambiguity reporting.
@@ -34,6 +48,6 @@
 - Added contradiction detection when constraints do not overlap the base search space.
 - Expanded the test suite to 54 tests.
 
-## 0.1.0
+### Initial prototype
 
 - Initial Euler/quaternion and angular-rate convention inference engine.

@@ -50,3 +50,10 @@ not become trajectory evidence. `core.py` produces decoded kinematic quantities;
 `statistics.py` summarizes excitation and residual processes; and `inference.py`
 is responsible for combining those inputs according to the documented evidence
 and policy rules.
+
+`TrajectoryData` owns read-only copies of validated input arrays, so later caller
+mutations cannot change a result. Exact quotient grouping uses disjoint-set
+connections for structural duals and clock-scale gauges. Prefix evidence uses
+cumulative residual energy under one fixed noise scale; this preserves the
+documented fixed-noise likelihood contrast while avoiding repeated rescoring of
+each earlier interval.

@@ -13,5 +13,6 @@ htmlcov/
 .codex_pydeps/
 .pytest-tmp/
 schemas/
+.validation-corpus/
 *.pdf
 .idea/

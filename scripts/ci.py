@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,45 @@ def _tool(name: str) -> str:
 def _run(command: list[str], label: str) -> None:
     print(f"\n== {label} ==")
     subprocess.run(command, cwd=ROOT, check=True)
+####
+
+
+def _check_ruff_format(ruff: str, scope_markers: str) -> None:
+    """Check Ruff formatting on a temporary marker-free source tree."""
+
+    with tempfile.TemporaryDirectory(dir=ROOT) as temporary_directory:
+        scratch = Path(temporary_directory)
+        listed = subprocess.check_output(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            cwd=ROOT,
+        )
+        for relative_name in listed.decode("utf-8").split("\0"):
+            relative_path = Path(relative_name)
+            if (
+                relative_path.suffix != ".py"
+                or not relative_path.parts
+                or relative_path.parts[0] not in SCOPE_PATHS
+            ):
+                continue
+            ####
+            source = ROOT / relative_path
+            if not source.is_file():
+                continue
+            ####
+            target = scratch / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        ####
+        paths = [str(scratch / directory) for directory in SCOPE_PATHS]
+        _run(
+            [scope_markers, "--strip", "--fix", "--quiet", *paths],
+            "Strip markers in temporary copy",
+        )
+        _run(
+            [ruff, "format", "--check", "--config", str(ROOT / "pyproject.toml"), *paths],
+            "Ruff format",
+        )
+    ####
 ####
 
 
@@ -55,20 +95,22 @@ def run_pipeline(fix: bool) -> None:
     ####
     ruff_check_args.append(".")
     _run([ruff, *ruff_check_args], "Ruff lint")
-    if fix:
-        _run([ruff, "format", "."], "Ruff format")
-    else:
-        print("\n== Ruff format ==")
-        print("Skipped check: scope markers intentionally run after Ruff formatting.")
-    ####
-
-    _run([_tool("pyright"), "--pythonpath", sys.executable], "Pyright")
-
     scope_markers = _tool("scope-markers")
-    scope_args = ["--fix", *SCOPE_PATHS] if fix else list(SCOPE_PATHS)
-    _run([scope_markers, *scope_args], "Scope markers")
     if fix:
+        # Ruff formats standalone #### comments as ordinary top-level comments.
+        # Remove markers before formatting so repeated --fix runs stay idempotent.
+        try:
+            _run([scope_markers, "--strip", "--fix", *SCOPE_PATHS], "Strip scope markers")
+            _run([ruff, "format", "."], "Ruff format")
+            _run([_tool("pyright"), "--pythonpath", sys.executable], "Pyright")
+        finally:
+            _run([scope_markers, "--fix", *SCOPE_PATHS], "Restore scope markers")
+        ####
         _run([scope_markers, *SCOPE_PATHS], "Scope marker check")
+    else:
+        _check_ruff_format(ruff, scope_markers)
+        _run([_tool("pyright"), "--pythonpath", sys.executable], "Pyright")
+        _run([scope_markers, *SCOPE_PATHS], "Scope markers")
     ####
 
     _run([sys.executable, "-m", "pytest", "-q"], "Tests")

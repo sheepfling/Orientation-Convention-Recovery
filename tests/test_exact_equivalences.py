@@ -138,6 +138,48 @@ def test_rate_unit_and_period_share_an_exact_gauge_without_timestamps() -> None:
 ####
 
 
+def test_direction_dual_and_rate_scale_gauge_form_one_transitive_class() -> None:
+    time_s = np.arange(81, dtype=np.float64) * 0.025
+    timed = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s, 0.7), _truth())
+    data = TrajectoryData(
+        representation=timed.representation,
+        orientation=timed.orientation,
+        rates=timed.rates,
+        time_s=None,
+    )
+    config = InferenceConfig(
+        search_space=SearchSpace(
+            attitude_directions=tuple(AttitudeDirection),
+            quaternion_orders=(QuaternionOrder.SCALAR_LAST,),
+            rate_frames=tuple(RateFrame),
+            rate_orders=("pqr",),
+            rate_units=tuple(RateUnit),
+            rate_signs=(-1, 1),
+        )
+    )
+
+    report = infer_conventions(data, config)
+    truth = next(
+        item
+        for item in report.rankings
+        if item.hypothesis.attitude_direction is AttitudeDirection.BODY_TO_WORLD
+        and item.hypothesis.rate_frame is RateFrame.BODY
+        and item.hypothesis.rate_unit is RateUnit.RADIANS_PER_SECOND
+        and item.hypothesis.rate_sign == 1
+    )
+
+    assert len(truth.exact_equivalent_hypothesis_ids) == 4
+    assert truth.hypothesis.structural_dual().identifier() in (
+        truth.exact_equivalent_hypothesis_ids
+    )
+    assert {
+        item.equivalence_class_id
+        for item in report.rankings
+        if item.hypothesis.identifier() in truth.exact_equivalent_hypothesis_ids
+    } == {truth.equivalence_class_id}
+####
+
+
 def test_quaternion_orthogonal_coordinate_map_preserves_intrinsic_distances() -> None:
     random_rotation = cast(Rotation, cast(Any, Rotation).random(24, random_state=9))
     quaternions = _quaternions(random_rotation)

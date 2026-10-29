@@ -9,9 +9,23 @@ compatibility alias.
 ```bash
 python -m pip install -e '.[dev,publish]'
 python scripts/ci.py
-python -m build
-python -m twine check dist/*
+python scripts/check_distribution.py
 ```
+
+The distribution check builds an sdist, builds a wheel from that sdist, validates
+metadata with Twine, and imports the installed wheel from outside the checkout.
+It uses a temporary directory and does not leave release files in `dist/`.
+For an offline local check with build dependencies already installed, use
+`python scripts/check_distribution.py --no-isolation --skip-twine`.
+
+To save the validated files for a release, use a fresh output directory:
+
+```bash
+python scripts/check_distribution.py --outdir dist
+```
+
+The command refuses to mix new release files with older wheels or sdists already
+in `dist/`.
 
 To repair auto-fixable issues before checking, run `python scripts/ci.py --fix`.
 

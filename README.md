@@ -94,7 +94,7 @@ python -m pip install -e .
 python -m attitude_convention_inference trajectory.csv
 ```
 
-`attitude-convention-inference` remains as a compatibility command alias in 0.4.x. The
+`attitude-convention-inference` remains as a compatibility command alias in 0.0.x. The
 canonical command is `attitude-conventions`.
 
 ## Automatic CSV detection
@@ -566,10 +566,11 @@ too quickly.
 Runtime dependencies are intentionally limited to:
 
 - NumPy;
-- SciPy.
+- SciPy;
+- Pydantic.
 
-CSV, JSON, CLI parsing, configuration models, and report serialization use the Python
-standard library plus Pydantic validation and schema generation. pandas is not required.
+CSV and CLI parsing use the Python standard library. Pydantic validates configuration
+and report models and generates exchange schemas. pandas is not required.
 
 ## Development
 
@@ -595,5 +596,19 @@ streams, nonincreasing timestamps, zero-norm quaternions, partial single-axis
 excitation, too-short trajectories, Euler branch crossings, scalar-first/last
 variants, and cohort packet failures. The seed is fixed by default so results can be
 compared across changes.
+
+For real-world accuracy, record independently labeled logs in a separate corpus and
+evaluate them with [`scripts/validate_corpus.py`](scripts/validate_corpus.py). The
+[validation guide](docs/VALIDATION.md) defines the manifest and interpretation. An
+independently calculated but still synthetic starter corpus can be generated with
+[`scripts/generate_validation_corpus.py`](scripts/generate_validation_corpus.py).
+The remaining release gates are tracked in the [productization roadmap](docs/ROADMAP.md).
+
+Build and smoke-test a source distribution and its wheel with:
+
+```bash
+python -m pip install -e '.[dev,publish]'
+python scripts/check_distribution.py
+```
 
 Python 3.11 or newer is required.

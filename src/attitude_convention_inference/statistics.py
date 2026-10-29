@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import exp, log
 
 from numpy import (
     argsort,
     ceil,
+    cumsum,
     diff,
     float64,
     mean,
     median,
+    minimum,
     newaxis,
     ones,
     pi,
@@ -38,6 +41,7 @@ __all__ = [
     "effective_excitation_rank",
     "estimate_noise_process",
     "fixed_noise_log_likelihood",
+    "log_likelihood_advantage_by_prefix",
     "raw_rate_excitation",
 ]
 
@@ -180,4 +184,35 @@ def fixed_noise_log_likelihood(
     degrees_of_freedom = 3 * interval_error_rotvecs.shape[0]
     sum_squared_error = float(np_sum(square(interval_error_rotvecs)))
     return -0.5 * (sum_squared_error / variance + degrees_of_freedom * log(2.0 * pi * variance))
+####
+
+
+def log_likelihood_advantage_by_prefix(
+    winner_errors: FloatArray,
+    competitor_errors: Sequence[FloatArray],
+    noise_sigma_rad: float,
+) -> FloatArray:
+    """Winner advantage at each prefix under the shared fixed Gaussian noise scale."""
+
+    if winner_errors.ndim != 2 or winner_errors.shape[1] != 3 or len(winner_errors) == 0:
+        raise ValueError("winner_errors must have shape (N, 3) with N > 0")
+    ####
+    if not competitor_errors:
+        raise ValueError("At least one competitor is required")
+    ####
+
+    def cumulative_energy(errors: FloatArray) -> FloatArray:
+        if errors.shape != winner_errors.shape:
+            raise ValueError("Competitor residuals must match winner residual shape")
+        ####
+        return cumsum(np_sum(square(errors), axis=1))
+    ####
+
+    best_competitor = cumulative_energy(competitor_errors[0])
+    for errors in competitor_errors[1:]:
+        best_competitor = minimum(best_competitor, cumulative_energy(errors))
+    ####
+    winner = cumulative_energy(winner_errors)
+    variance = max(float(noise_sigma_rad) ** 2, 1.0e-24)
+    return (best_competitor - winner) / (2.0 * variance)
 ####

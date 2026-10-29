@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections.abc import Iterable
 from dataclasses import dataclass
 from math import exp, isclose, log, sqrt
@@ -13,7 +14,6 @@ from numpy import (
 from numpy import (
     amax,
     amin,
-    argmax,
     asarray,
     clip,
     diff,
@@ -84,8 +84,7 @@ from .models import (
     ScaleRisk,
 )
 from .statistics import effective_excitation_rank as _effective_excitation_rank
-from .statistics import estimate_noise_process
-from .statistics import fixed_noise_log_likelihood as _fixed_noise_log_likelihood
+from .statistics import estimate_noise_process, log_likelihood_advantage_by_prefix
 from .statistics import raw_rate_excitation as _raw_rate_excitation
 
 __all__ = [
@@ -426,13 +425,25 @@ def _annotate_exact_equivalences(
     identifiers = {
         item.result.hypothesis.identifier(): index for index, item in enumerate(candidates)
     }
-    neighbours = [set([index]) for index in range(len(candidates))]
+    parents = list(range(len(candidates)))
     scale_gauge = data.time_s is None and config.sample_period_s is None
+
+    def find(index: int) -> int:
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        ####
+        return index
+    ####
+
+    def join(left: int, right: int) -> None:
+        parents[find(left)] = find(right)
+    ####
 
     for index, item in enumerate(candidates):
         partner = item.result.hypothesis.structural_dual().identifier()
         if partner in identifiers:
-            neighbours[index].add(identifiers[partner])
+            join(index, identifiers[partner])
         ####
         if scale_gauge and not _period_is_active_bound(item.result, config):
             unit_partner = _rate_unit_partner(item.result.hypothesis).identifier()
@@ -440,40 +451,18 @@ def _annotate_exact_equivalences(
             if partner_index is not None and not _period_is_active_bound(
                 candidates[partner_index].result, config
             ):
-                neighbours[index].add(partner_index)
+                join(index, partner_index)
             ####
         ####
     ####
 
-    groups: list[tuple[int, ...]] = []
-    unseen = set(range(len(candidates)))
-    while unseen:
-        pending = [unseen.pop()]
-        group: set[int] = set()
-        while pending:
-            index = pending.pop()
-            if index in group:
-                continue
-            ####
-            group.add(index)
-            linked = neighbours[index]
-            for other_index, other_neighbours in enumerate(neighbours):
-                if index in other_neighbours:
-                    linked = linked | {other_index}
-                ####
-            ####
-            for other_index in linked:
-                if other_index in unseen:
-                    unseen.remove(other_index)
-                    pending.append(other_index)
-                ####
-            ####
-        ####
-        groups.append(tuple(sorted(group)))
+    groups: dict[int, list[int]] = {}
+    for index in range(len(candidates)):
+        groups.setdefault(find(index), []).append(index)
     ####
 
     updated = list(candidates)
-    for group_indices in groups:
+    for group_indices in groups.values():
         members = [candidates[index] for index in group_indices]
         identifiers_in_group = tuple(
             sorted(item.result.hypothesis.identifier() for item in members)
@@ -831,13 +820,13 @@ def _assign_ranks_and_support(
         key=lambda class_id: (class_risks[class_id], class_id, class_keys[class_id]),
     )
     distinct_risks = sorted(set(class_risks.values()))
-    next_class_risk = {
-        class_id: next(
-            (risk for risk in distinct_risks if risk > class_risks[class_id]),
-            None,
+    next_class_risk: dict[str, float | None] = {}
+    for class_id in ordered_classes:
+        next_index = bisect_right(distinct_risks, class_risks[class_id])
+        next_class_risk[class_id] = (
+            distinct_risks[next_index] if next_index < len(distinct_risks) else None
         )
-        for class_id in ordered_classes
-    }
+    ####
 
     def _class_gap(item: _ScoredCandidate) -> float | None:
         next_risk = next_class_risk[item.result.equivalence_class_id]
@@ -994,29 +983,18 @@ def _evidence_summary(
         )
     ####
 
-    final_scores = asarray(
-        [
-            _fixed_noise_log_likelihood(item.interval_error_rotvecs, noise.sigma_rad)
-            for item in data_ranked
-        ],
-        dtype=float64,
+    prefix_advantages = log_likelihood_advantage_by_prefix(
+        data_winner.interval_error_rotvecs,
+        tuple(item.interval_error_rotvecs for item in data_ranked[1:]),
+        noise.sigma_rad,
     )
-    final_delta = float(final_scores[0] - amax(final_scores[1:]))
+    final_delta = float(prefix_advantages[-1])
     minimum = min(config.evidence_min_intervals, interval_count)
     stable_count = 0
     earliest = interval_count
     sufficient = False
     for prefix in range(minimum, interval_count + 1):
-        prefix_scores = asarray(
-            [
-                _fixed_noise_log_likelihood(item.interval_error_rotvecs[:prefix], noise.sigma_rad)
-                for item in data_ranked
-            ],
-            dtype=float64,
-        )
-        winner_index = int(argmax(prefix_scores))
-        winner_delta = float(prefix_scores[0] - amax(prefix_scores[1:]))
-        if winner_index == 0 and winner_delta >= config.evidence_log_likelihood_ratio_threshold:
+        if prefix_advantages[prefix - 1] >= config.evidence_log_likelihood_ratio_threshold:
             stable_count += 1
         else:
             stable_count = 0

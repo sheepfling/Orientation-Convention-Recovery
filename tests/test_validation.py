@@ -27,6 +27,34 @@ def test_rejects_nonincreasing_time() -> None:
 ####
 
 
+def test_trajectory_data_owns_read_only_validated_arrays() -> None:
+    orientation = np.zeros((3, 4), dtype=np.float64)
+    orientation[:, 3] = 1.0
+    rates = np.zeros((3, 3), dtype=np.float64)
+    time_s = np.arange(3, dtype=np.float64)
+
+    data = TrajectoryData(
+        representation=AttitudeRepresentation.QUATERNION,
+        orientation=orientation,
+        rates=rates,
+        time_s=time_s,
+    )
+    orientation[0, 0] = 0.5
+    rates[0, 0] = 1.0
+    time_s[0] = -1.0
+
+    assert data.orientation is not None
+    assert data.rates is not None
+    assert data.time_s is not None
+    assert data.orientation[0, 0] == 0.0
+    assert data.rates[0, 0] == 0.0
+    assert data.time_s[0] == 0.0
+    with pytest.raises(ValueError, match="read-only"):
+        data.orientation[0, 0] = 0.5
+    ####
+####
+
+
 def test_rejects_invalid_rate_order() -> None:
     with pytest.raises(ValueError, match="p/q/r permutation"):
         SearchSpace(rate_orders=("xyz",))

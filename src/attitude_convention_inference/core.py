@@ -13,6 +13,7 @@ from numpy import (
     amax,
     arange,
     argmin,
+    array,
     asarray,
     clip,
     diff,
@@ -174,9 +175,11 @@ class TrajectoryData:
     time_s: FloatArray | None = None
 
     def __post_init__(self) -> None:
-        orientation = None if self.orientation is None else asarray(self.orientation, dtype=float64)
-        rates = None if self.rates is None else asarray(self.rates, dtype=float64)
-        time_s = None if self.time_s is None else asarray(self.time_s, dtype=float64)
+        orientation = (
+            None if self.orientation is None else array(self.orientation, dtype=float64, copy=True)
+        )
+        rates = None if self.rates is None else array(self.rates, dtype=float64, copy=True)
+        time_s = None if self.time_s is None else array(self.time_s, dtype=float64, copy=True)
 
         if orientation is None and rates is None:
             raise ValueError("At least one of orientation or rates must be supplied.")
@@ -232,6 +235,12 @@ class TrajectoryData:
             ####
         ####
 
+        # Own the buffers before freezing them so callers cannot change the validated data.
+        for stream in (orientation, rates, time_s):
+            if stream is not None:
+                stream.setflags(write=False)
+            ####
+        ####
         object.__setattr__(self, "orientation", orientation)
         object.__setattr__(self, "rates", rates)
         object.__setattr__(self, "time_s", time_s)

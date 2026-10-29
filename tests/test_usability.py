@@ -213,11 +213,13 @@ def test_python_module_entry_point(tmp_path: Path) -> None:
 ####
 
 
-def test_version_is_exported() -> None:
-    from importlib.metadata import version
-
-    assert __version__ == version("attitude-convention-inference")
+def test_version_is_exported(capsys: pytest.CaptureFixture[str]) -> None:
     assert __version__
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--version"])
+    ####
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out.strip() == f"attitude-conventions {__version__}"
 ####
 
 
