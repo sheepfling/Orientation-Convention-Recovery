@@ -6,7 +6,8 @@ from dataclasses import replace
 from weakref import ReferenceType, ref
 
 import pytest
-from numpy import arange, float64
+from numpy import arange, float64, square
+from numpy import sum as np_sum
 from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation
 
@@ -15,9 +16,12 @@ from attitude_convention_inference import (
     AttitudeDirection,
     AttitudeRepresentation,
     ConventionHypothesis,
+    ConventionPriors,
     EulerMode,
     InferenceConfig,
+    QuaternionOrder,
     RateFrame,
+    RateUnit,
     SearchSpace,
     TrajectoryData,
     best_interval_diagnostics,
@@ -43,9 +47,53 @@ def test_full_scoring_retains_interval_details_only_on_request() -> None:
     detailed = score_hypothesis(data, hypothesis, config, retain_interval_details=True)
 
     assert compact.interval_details is None
+    assert compact.interval_error_rotvecs is None
     assert detailed.interval_details is not None
-    assert_allclose(compact.interval_error_rotvecs, detailed.interval_error_rotvecs)
+    assert detailed.interval_error_rotvecs is not None
+    assert_allclose(compact.interval_squared_errors_rad2, detailed.interval_squared_errors_rad2)
+    assert_allclose(
+        compact.interval_squared_errors_rad2,
+        np_sum(square(detailed.interval_error_rotvecs), axis=1),
+    )
     assert len(best_interval_diagnostics(data, report, config)) == data.sample_count - 1
+####
+
+
+def test_evidence_uses_data_winner_when_prior_changes_posterior_winner() -> None:
+    motion = analytic_motion(arange(81, dtype=float64) * 0.025)
+    data = TrajectoryData(
+        representation=AttitudeRepresentation.QUATERNION,
+        orientation=motion.quaternion_xyzw,
+        rates=motion.body_rates_rad_s,
+        time_s=motion.time_s,
+    )
+    search_space = replace(
+        SearchSpace(),
+        attitude_directions=(AttitudeDirection.BODY_TO_WORLD,),
+        quaternion_orders=(QuaternionOrder.SCALAR_LAST,),
+        rate_frames=(RateFrame.BODY,),
+        rate_orders=("pqr", "rqp"),
+        rate_units=(RateUnit.RADIANS_PER_SECOND,),
+        rate_signs=(1,),
+    )
+    unweighted = infer_conventions(data, InferenceConfig(search_space=search_space))
+    prior_weighted = infer_conventions(
+        data,
+        InferenceConfig(
+            search_space=search_space,
+            priors=ConventionPriors(rate_order={"rqp": 1.0e12}),
+        ),
+    )
+
+    assert unweighted.rankings[0].hypothesis.rate_order == "pqr"
+    assert prior_weighted.rankings[0].hypothesis.rate_order == "rqp"
+    assert prior_weighted.rankings[0].data_rank == 2
+    assert prior_weighted.diagnostics.estimated_noise_sigma_rad == pytest.approx(
+        unweighted.diagnostics.estimated_noise_sigma_rad
+    )
+    assert prior_weighted.diagnostics.evidence_log_likelihood_ratio == pytest.approx(
+        unweighted.diagnostics.evidence_log_likelihood_ratio
+    )
 ####
 
 

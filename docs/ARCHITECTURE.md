@@ -64,8 +64,11 @@ into read-only views, including the inner maps in a hypothesis-space summary.
 JSON objects, so `model_dump_json()` and generated validation schemas stay usable.
 Callers can edit a dumped dictionary without changing the model it came from.
 
-Normal inference retains a candidate's result and residual rotation vectors, but
-not its decoded rates, interval durations, predicted/observed rotations, or path
-angles. Overall and per-interval diagnostics recompute the selected candidate's
-large arrays on demand. This reduces memory across a broad search at a modest
-runtime cost; see [the performance baseline](PERFORMANCE.md).
+Normal inference retains each candidate's result and one squared angular error per
+interval, but not its three-component residual vectors, decoded rates, interval
+durations, predicted/observed rotations, or path angles. Evidence prefixes use the
+stored scalar energies. Overall and per-interval diagnostics recompute the selected
+candidate's large arrays on demand; if the data-winning hypothesis differs from
+the operational selection, its residual vectors are also recomputed for noise
+estimation. This reduces memory across a broad search at a modest runtime cost;
+see [the performance baseline](PERFORMANCE.md).

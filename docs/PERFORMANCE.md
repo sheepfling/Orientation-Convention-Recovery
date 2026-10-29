@@ -39,8 +39,9 @@ The benchmark also accepts `euler-compact` (two hypotheses) and `euler-default`
 (576 hypotheses). The default Euler search has 48 distinct attitude decodings;
 the inference loop now retains only the current decoding while it evaluates its
 rate hypotheses. A regression test checks that earlier decoded rotations are no
-longer held live. This does not change candidate ranking or eliminate the residual
-vectors retained for evidence comparisons.
+longer held live. This does not change candidate ranking. A later change also
+replaced retained three-component residual vectors with per-interval squared
+errors for evidence comparisons; selected residual vectors are recomputed as needed.
 
 The following before/after measurements used the same Windows 11, CPython 3.14.6,
 NumPy 2.5.2, and SciPy 1.18.0 environment, with one timing call and a separate `tracemalloc`
@@ -116,3 +117,26 @@ versus 28.03 s in the preceding baseline run. Peak working set was approximately
 unchanged (106,242,048 B versus 105,869,312 B). This speed comparison also comes
 from one run per version on one host, so it is a lead for further measurement,
 not a portable speedup guarantee.
+
+## Compact residual evidence
+
+Ordinary scoring previously retained a three-component rotation vector for every
+interval of every hypothesis, even though the cross-candidate fixed-noise evidence
+calculation uses only its squared magnitude. It now retains one squared-error
+value per interval and recomputes full vectors for selected noise and interval
+diagnostics. The vector-based evidence function remains available and delegates
+to the same scalar-energy calculation. Tests compare the two formulations and
+check that ordinary candidates do not retain vectors.
+
+Fresh-process measurements for the 576-hypothesis Euler search on the same Windows
+host are below. The before run used commit `5f5b772`; the after run used the compact
+working tree. Each is one run, so timings are not a robust speed comparison.
+
+| Samples | Peak working set before | Peak working set after | Inference before | Inference after |
+|--------:|------------------------:|-----------------------:|-----------------:|----------------:|
+| 2,001 | 122,363,904 B | 101,896,192 B | 16.72 s | 15.83 s |
+| 10,001 | 244,006,912 B | 147,255,296 B | 82.00 s | 79.45 s |
+
+The 10,001-sample case used about 40% less peak working-set memory in this
+measurement. The result is still an analytic synthetic workload on one interpreter;
+cross-version and independently sourced workload measurements remain open.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from math import exp, log
 
@@ -42,6 +42,7 @@ __all__ = [
     "estimate_noise_process",
     "fixed_noise_log_likelihood",
     "log_likelihood_advantage_by_prefix",
+    "log_likelihood_advantage_from_squared_errors_by_prefix",
     "raw_rate_excitation",
 ]
 
@@ -201,18 +202,49 @@ def log_likelihood_advantage_by_prefix(
         raise ValueError("At least one competitor is required")
     ####
 
-    def cumulative_energy(errors: FloatArray) -> FloatArray:
-        if errors.shape != winner_errors.shape:
-            raise ValueError("Competitor residuals must match winner residual shape")
+    def squared_energies() -> Iterator[FloatArray]:
+        for errors in competitor_errors:
+            if errors.shape != winner_errors.shape:
+                raise ValueError("Competitor residuals must match winner residual shape")
+            ####
+            yield np_sum(square(errors), axis=1)
         ####
-        return cumsum(np_sum(square(errors), axis=1))
     ####
 
-    best_competitor = cumulative_energy(competitor_errors[0])
-    for errors in competitor_errors[1:]:
-        best_competitor = minimum(best_competitor, cumulative_energy(errors))
+    return log_likelihood_advantage_from_squared_errors_by_prefix(
+        np_sum(square(winner_errors), axis=1), squared_energies(), noise_sigma_rad
+    )
+####
+
+
+def log_likelihood_advantage_from_squared_errors_by_prefix(
+    winner_squared_errors: FloatArray,
+    competitor_squared_errors: Iterable[FloatArray],
+    noise_sigma_rad: float,
+) -> FloatArray:
+    """Fixed-noise winner advantage from compact per-interval squared errors."""
+
+    if winner_squared_errors.ndim != 1 or winner_squared_errors.size == 0:
+        raise ValueError("winner_squared_errors must have shape (N,) with N > 0")
     ####
-    winner = cumulative_energy(winner_errors)
+
+    def cumulative_energy(squared_errors: FloatArray) -> FloatArray:
+        if squared_errors.shape != winner_squared_errors.shape:
+            raise ValueError("Competitor squared errors must match winner shape")
+        ####
+        return cumsum(squared_errors)
+    ####
+
+    competitors = iter(competitor_squared_errors)
+    first_competitor = next(competitors, None)
+    if first_competitor is None:
+        raise ValueError("At least one competitor is required")
+    ####
+    best_competitor = cumulative_energy(first_competitor)
+    for squared_errors in competitors:
+        best_competitor = minimum(best_competitor, cumulative_energy(squared_errors))
+    ####
+    winner = cumulative_energy(winner_squared_errors)
     variance = max(float(noise_sigma_rad) ** 2, 1.0e-24)
     return (best_competitor - winner) / (2.0 * variance)
 ####

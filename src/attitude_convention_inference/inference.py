@@ -71,7 +71,10 @@ from .scoring import replace_result as _replace_result
 from .scoring import score_hypothesis as _score_hypothesis
 from .scoring import score_partial_hypothesis as _score_partial_hypothesis
 from .statistics import effective_excitation_rank as _effective_excitation_rank
-from .statistics import estimate_noise_process, log_likelihood_advantage_by_prefix
+from .statistics import (
+    estimate_noise_process,
+    log_likelihood_advantage_from_squared_errors_by_prefix,
+)
 from .statistics import raw_rate_excitation as _raw_rate_excitation
 
 __all__ = [
@@ -609,7 +612,9 @@ def _assign_ranks_and_support(
 
 
 def _evidence_summary(
+    data: TrajectoryData,
     ranked: tuple[_ScoredCandidate, ...],
+    detailed: _ScoredCandidate,
     config: InferenceConfig,
 ) -> _EvidenceSummary:
     """Estimate noise and find the earliest stable evidence prefix."""
@@ -620,11 +625,27 @@ def _evidence_summary(
     ####
     data_ranked = tuple(representatives.values())
     data_winner = data_ranked[0]
+    winner_details = detailed
+    if detailed.result.hypothesis != data_winner.result.hypothesis:
+        winner_details = (
+            _score_partial_hypothesis(
+                data, data_winner.result.hypothesis, config, retain_interval_details=True
+            )
+            if data.orientation is None or data.rates is None
+            else _score_hypothesis(
+                data, data_winner.result.hypothesis, config, retain_interval_details=True
+            )
+        )
+    ####
+    winner_errors = winner_details.interval_error_rotvecs
+    if winner_errors is None:
+        raise RuntimeError("Data-winning residual vectors were not retained")
+    ####
     noise = estimate_noise_process(
-        data_winner.interval_error_rotvecs,
+        winner_errors,
         config.trim_fraction,
     )
-    interval_count = data_winner.interval_error_rotvecs.shape[0]
+    interval_count = data_winner.interval_squared_errors_rad2.shape[0]
     if data_winner.result.observed_step_rms_rad < config.slow_step_threshold_rad:
         return _EvidenceSummary(
             noise.sigma_rad,
@@ -648,9 +669,9 @@ def _evidence_summary(
         )
     ####
 
-    prefix_advantages = log_likelihood_advantage_by_prefix(
-        data_winner.interval_error_rotvecs,
-        tuple(item.interval_error_rotvecs for item in data_ranked[1:]),
+    prefix_advantages = log_likelihood_advantage_from_squared_errors_by_prefix(
+        data_winner.interval_squared_errors_rad2,
+        (item.interval_squared_errors_rad2 for item in data_ranked[1:]),
         noise.sigma_rad,
     )
     final_delta = float(prefix_advantages[-1])
@@ -895,7 +916,7 @@ def _build_overall_diagnostics(
         data,
         config,
     )
-    evidence = _evidence_summary(ranked, config)
+    evidence = _evidence_summary(data, ranked, detailed, config)
     effective_rank = excitation.effective_rank
     singular_values = excitation.singular_values
     raw_excitation_rank = raw_excitation.rank
@@ -1242,6 +1263,9 @@ def best_interval_diagnostics(
     predicted_quaternions = _rotation_quaternions(details.predicted_intervals)
     observed_quaternions = _rotation_quaternions(details.observed_intervals)
     errors = scored.interval_error_rotvecs
+    if errors is None:
+        raise RuntimeError("Interval residual vectors were not retained for diagnostics")
+    ####
     rows: list[dict[str, float | int | bool]] = []
 
     for index in range(data.sample_count - 1):

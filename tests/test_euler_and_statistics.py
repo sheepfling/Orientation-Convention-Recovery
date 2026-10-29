@@ -5,6 +5,8 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
+from numpy import square
+from numpy import sum as np_sum
 from scipy.spatial.transform import Rotation
 
 from attitude_convention_inference import (
@@ -28,6 +30,7 @@ from attitude_convention_inference.inference import estimate_noise_process
 from attitude_convention_inference.statistics import (
     fixed_noise_log_likelihood,
     log_likelihood_advantage_by_prefix,
+    log_likelihood_advantage_from_squared_errors_by_prefix,
 )
 from attitude_convention_inference.synthetic import (
     SyntheticConvention,
@@ -305,6 +308,12 @@ def test_prefix_evidence_matches_direct_fixed_noise_likelihood() -> None:
     sigma = 0.0025
 
     advantages = log_likelihood_advantage_by_prefix(winner, competitors, sigma)
+    compact_advantages = log_likelihood_advantage_from_squared_errors_by_prefix(
+        np_sum(square(winner), axis=1),
+        (np_sum(square(item), axis=1) for item in competitors),
+        sigma,
+    )
+    assert compact_advantages == pytest.approx(advantages)
 
     for prefix in range(1, len(winner) + 1):
         expected = fixed_noise_log_likelihood(winner[:prefix], sigma) - max(

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stored per-candidate squared residual energies instead of full residual vectors,
+  retaining detailed vectors only when diagnostics require them.
 - Reused increment-prefix rotations across scoring windows and replaced per-interval
   SciPy object composition with a normalized scalar quaternion accumulator.
 - Added Euler benchmark workloads and fresh-process cold-start/peak-memory

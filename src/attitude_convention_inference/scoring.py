@@ -7,6 +7,7 @@ from math import log, sqrt
 
 from numpy import amax, asarray, diff, float64, mean, median, ones, quantile, square, zeros
 from numpy import sqrt as np_sqrt
+from numpy import sum as np_sum
 from numpy.linalg import norm
 from scipy.spatial.transform import Rotation
 
@@ -48,10 +49,11 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True)
 class ScoredCandidate:
-    """A candidate result with residual vectors and optional detailed arrays."""
+    """A result with compact interval energy and optional detailed residuals."""
 
     result: CandidateResult
-    interval_error_rotvecs: FloatArray
+    interval_squared_errors_rad2: FloatArray
+    interval_error_rotvecs: FloatArray | None = None
     interval_details: IntervalDetails | None = None
 ####
 
@@ -247,7 +249,12 @@ def score_hypothesis(
     )
     return ScoredCandidate(
         result=result,
-        interval_error_rotvecs=asarray(interval_errors, dtype=float64),
+        interval_squared_errors_rad2=asarray(
+            np_sum(square(interval_errors), axis=1), dtype=float64
+        ),
+        interval_error_rotvecs=(
+            asarray(interval_errors, dtype=float64) if retain_interval_details else None
+        ),
         interval_details=(
             IntervalDetails(
                 rates_rad_s=rates_rad_s,
@@ -271,6 +278,7 @@ def replace_result(
 
     return ScoredCandidate(
         result=result,
+        interval_squared_errors_rad2=item.interval_squared_errors_rad2,
         interval_error_rotvecs=item.interval_error_rotvecs,
         interval_details=item.interval_details,
     )
@@ -329,7 +337,7 @@ def score_partial_hypothesis(
         heuristic_features = HeuristicFeatures()
     ####
 
-    errors = zeros((interval_count, 3), dtype=float64)
+    squared_errors = zeros(interval_count, dtype=float64)
     score = max(float(representation_score), 0.0)
     result = CandidateResult(
         hypothesis=hypothesis,
@@ -377,5 +385,12 @@ def score_partial_hypothesis(
             path_angles=zeros(interval_count, dtype=float64),
         )
     ####
-    return ScoredCandidate(result=result, interval_error_rotvecs=errors, interval_details=details)
+    return ScoredCandidate(
+        result=result,
+        interval_squared_errors_rad2=squared_errors,
+        interval_error_rotvecs=(
+            zeros((interval_count, 3), dtype=float64) if retain_interval_details else None
+        ),
+        interval_details=details,
+    )
 ####
