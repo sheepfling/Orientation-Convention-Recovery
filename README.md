@@ -603,6 +603,8 @@ evaluate them with [`scripts/validate_corpus.py`](scripts/validate_corpus.py). T
 independently calculated but still synthetic starter corpus can be generated with
 [`scripts/generate_validation_corpus.py`](scripts/generate_validation_corpus.py).
 The remaining release gates are tracked in the [productization roadmap](docs/ROADMAP.md).
+The [performance baseline](docs/PERFORMANCE.md) records measured latency and traced
+allocation for small and default quaternion searches.
 
 Build and smoke-test a source distribution and its wheel with:
 

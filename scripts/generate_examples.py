@@ -6,7 +6,7 @@ import csv
 import json
 import math
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -350,6 +350,9 @@ def _write_synthetic_quaternion_csv(path: Path) -> None:
         rate_order="rqp",
     )
     data = encode_synthetic_trajectory(time_s, rates, convention)
+    if data.time_s is None or data.orientation is None or data.rates is None:
+        raise RuntimeError("Synthetic quaternion example requires all three data streams")
+    ####
     with path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(("time", "q0", "q1", "q2", "q3", "w0", "w1", "w2"))
@@ -426,10 +429,12 @@ def generate_examples(root: Path) -> None:
     }
     _write_json(examples / "partially_known_config.json", config_payload)
     profile_payload = _build_preference_profile().model_dump(mode="json")
-    representative_preferences = profile_payload["representative_preferences"]
+    representative_preferences: object = profile_payload["representative_preferences"]
     if isinstance(representative_preferences, dict):
         profile_payload["representative_preferences"] = {
-            key: value for key, value in representative_preferences.items() if value
+            key: value
+            for key, value in cast(dict[str, object], representative_preferences).items()
+            if value
         }
     ####
     _write_json(examples / "preference_profile.json", {"preference_profile": profile_payload})

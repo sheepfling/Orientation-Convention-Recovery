@@ -92,5 +92,5 @@ line-length = 100
 # separately on every supported interpreter in the CI matrix.
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
-include = ["src", "tests", "examples"]
+include = ["src", "tests", "examples", "scripts"]
 reportMissingTypeStubs = "none"

@@ -98,12 +98,19 @@ __all__ = [
 @dataclass(frozen=True, slots=True)
 class _ScoredCandidate:
     result: CandidateResult
-    attitudes: Rotation
+    interval_error_rotvecs: FloatArray
+    interval_details: _IntervalDetails | None = None
+####
+
+
+@dataclass(frozen=True, slots=True)
+class _IntervalDetails:
+    """Large per-interval arrays retained only for an explicit diagnostics request."""
+
     rates_rad_s: FloatArray
     interval_durations_s: FloatArray
     predicted_intervals: Rotation
     observed_intervals: Rotation
-    interval_error_rotvecs: FloatArray
     path_angles: FloatArray
 ####
 
@@ -144,6 +151,7 @@ def _score_hypothesis(
     *,
     attitudes: Rotation | None = None,
     rates_rad_s: FloatArray | None = None,
+    retain_interval_details: bool = False,
 ) -> _ScoredCandidate:
     attitudes = decode_attitudes(data, hypothesis) if attitudes is None else attitudes
     rates_rad_s = decode_rates(data, hypothesis) if rates_rad_s is None else rates_rad_s
@@ -316,13 +324,18 @@ def _score_hypothesis(
     )
     return _ScoredCandidate(
         result=result,
-        attitudes=attitudes,
-        rates_rad_s=rates_rad_s,
-        interval_durations_s=durations,
-        predicted_intervals=predicted,
-        observed_intervals=observed,
         interval_error_rotvecs=asarray(interval_errors, dtype=float64),
-        path_angles=path_angles,
+        interval_details=(
+            _IntervalDetails(
+                rates_rad_s=rates_rad_s,
+                interval_durations_s=durations,
+                predicted_intervals=predicted,
+                observed_intervals=observed,
+                path_angles=path_angles,
+            )
+            if retain_interval_details
+            else None
+        ),
     )
 ####
 
@@ -355,13 +368,8 @@ def _replace_result(
 ) -> _ScoredCandidate:
     return _ScoredCandidate(
         result=result,
-        attitudes=item.attitudes,
-        rates_rad_s=item.rates_rad_s,
-        interval_durations_s=item.interval_durations_s,
-        predicted_intervals=item.predicted_intervals,
-        observed_intervals=item.observed_intervals,
         interval_error_rotvecs=item.interval_error_rotvecs,
-        path_angles=item.path_angles,
+        interval_details=item.interval_details,
     )
 ####
 
@@ -680,13 +688,14 @@ def _score_partial_hypothesis(
     data: TrajectoryData,
     hypothesis: ConventionHypothesis,
     config: InferenceConfig,
+    *,
+    retain_interval_details: bool = False,
 ) -> _ScoredCandidate:
     """Create an explicit heuristic/non-identifying result for partial streams."""
 
     sample_count = data.sample_count
     interval_count = sample_count - 1
     if data.orientation is not None:
-        attitudes = decode_attitudes(data, hypothesis)
         euler_diagnostics = _euler_heuristic_diagnostics(data, hypothesis)
         euler_range_penalty = euler_diagnostics.range_penalty_rad2
         euler_branch_switches = euler_diagnostics.branch_switch_count
@@ -698,7 +707,6 @@ def _score_partial_hypothesis(
         wrap_status = wrap_diagnostics.status
         wrap_score = wrap_diagnostics.score
         representation_score = wrap_score + euler_range_penalty + euler_branch_cost
-        rates = zeros((sample_count, 3), dtype=float64)
         gimbal_fraction = _gimbal_lock_fraction(data, hypothesis, config)
         heuristic_features = HeuristicFeatures(
             wrap_score=wrap_score,
@@ -719,8 +727,6 @@ def _score_partial_hypothesis(
             },
         )
     else:
-        attitudes = Rotation.identity(sample_count)
-        rates = decode_rates(data, hypothesis)
         euler_range_penalty = 0.0
         euler_branch_switches = 0
         euler_singularity_margin = None
@@ -730,11 +736,6 @@ def _score_partial_hypothesis(
         heuristic_features = HeuristicFeatures()
     ####
 
-    durations = (
-        diff(data.time_s) if data.time_s is not None else ones(interval_count, dtype=float64)
-    )
-    predicted = Rotation.identity(interval_count)
-    observed = Rotation.identity(interval_count)
     errors = zeros((interval_count, 3), dtype=float64)
     score = max(float(representation_score), 0.0)
     result = CandidateResult(
@@ -765,16 +766,25 @@ def _score_partial_hypothesis(
         euler_branch_cost_rad2=euler_branch_cost,
         heuristic_features=heuristic_features,
     )
-    return _ScoredCandidate(
-        result=result,
-        attitudes=attitudes,
-        rates_rad_s=rates,
-        interval_durations_s=durations,
-        predicted_intervals=predicted,
-        observed_intervals=observed,
-        interval_error_rotvecs=errors,
-        path_angles=zeros(interval_count, dtype=float64),
-    )
+    details = None
+    if retain_interval_details:
+        rates = (
+            zeros((sample_count, 3), dtype=float64)
+            if data.orientation is not None
+            else decode_rates(data, hypothesis)
+        )
+        durations = (
+            diff(data.time_s) if data.time_s is not None else ones(interval_count, dtype=float64)
+        )
+        details = _IntervalDetails(
+            rates_rad_s=rates,
+            interval_durations_s=durations,
+            predicted_intervals=Rotation.identity(interval_count),
+            observed_intervals=Rotation.identity(interval_count),
+            path_angles=zeros(interval_count, dtype=float64),
+        )
+    ####
+    return _ScoredCandidate(result=result, interval_error_rotvecs=errors, interval_details=details)
 ####
 
 
@@ -1208,12 +1218,23 @@ def _build_overall_diagnostics(
     )
     unresolved = _unresolved_dimensions(evidence_near_ties)
     posterior_unresolved = _unresolved_dimensions(posterior_near_ties)
-    observed_angles = _rotation_magnitudes(best.observed_intervals)
+    detailed = (
+        _score_partial_hypothesis(
+            data, best.result.hypothesis, config, retain_interval_details=True
+        )
+        if data.orientation is None or data.rates is None
+        else _score_hypothesis(data, best.result.hypothesis, config, retain_interval_details=True)
+    )
+    details = detailed.interval_details
+    if details is None:
+        raise RuntimeError("Interval details were not retained for diagnostics")
+    ####
+    observed_angles = _rotation_magnitudes(details.observed_intervals)
     total_motion = float(np_sum(observed_angles))
     step_rms = float(np_sqrt(mean(square(observed_angles))))
     excitation = _effective_excitation_rank(
-        best.rates_rad_s,
-        best.interval_durations_s,
+        details.rates_rad_s,
+        details.interval_durations_s,
     )
     raw_excitation = _raw_rate_excitation(
         data,
@@ -1548,25 +1569,34 @@ def best_interval_diagnostics(
     report: InferenceReport,
     config: InferenceConfig | None = None,
 ) -> tuple[dict[str, float | int | bool], ...]:
+    if data.orientation is None or data.rates is None:
+        raise ValueError("Interval diagnostics require both orientation and angular rates")
+    ####
     resolved_config = config or InferenceConfig()
-    scored = _score_hypothesis(data, report.best.hypothesis, resolved_config)
-    predicted_quaternions = _rotation_quaternions(scored.predicted_intervals)
-    observed_quaternions = _rotation_quaternions(scored.observed_intervals)
+    scored = _score_hypothesis(
+        data, report.best.hypothesis, resolved_config, retain_interval_details=True
+    )
+    details = scored.interval_details
+    if details is None:
+        raise RuntimeError("Interval details were not retained for diagnostics")
+    ####
+    predicted_quaternions = _rotation_quaternions(details.predicted_intervals)
+    observed_quaternions = _rotation_quaternions(details.observed_intervals)
     errors = scored.interval_error_rotvecs
     rows: list[dict[str, float | int | bool]] = []
 
     for index in range(data.sample_count - 1):
         row: dict[str, float | int | bool] = {
             "interval": index,
-            "dt_s": float(scored.interval_durations_s[index]),
+            "dt_s": float(details.interval_durations_s[index]),
             "omega_x_rad_s": float(
-                0.5 * (scored.rates_rad_s[index, 0] + scored.rates_rad_s[index + 1, 0])
+                0.5 * (details.rates_rad_s[index, 0] + details.rates_rad_s[index + 1, 0])
             ),
             "omega_y_rad_s": float(
-                0.5 * (scored.rates_rad_s[index, 1] + scored.rates_rad_s[index + 1, 1])
+                0.5 * (details.rates_rad_s[index, 1] + details.rates_rad_s[index + 1, 1])
             ),
             "omega_z_rad_s": float(
-                0.5 * (scored.rates_rad_s[index, 2] + scored.rates_rad_s[index + 1, 2])
+                0.5 * (details.rates_rad_s[index, 2] + details.rates_rad_s[index + 1, 2])
             ),
             "observed_delta_qx": float(observed_quaternions[index, 0]),
             "observed_delta_qy": float(observed_quaternions[index, 1]),
@@ -1580,9 +1610,9 @@ def best_interval_diagnostics(
             "error_rotvec_y_rad": float(errors[index, 1]),
             "error_rotvec_z_rad": float(errors[index, 2]),
             "error_angle_rad": float(norm(errors[index, :])),
-            "unwrapped_rate_angle_rad": float(scored.path_angles[index]),
-            "near_alias": bool(scored.path_angles[index] >= resolved_config.near_alias_step_rad),
-            "hard_alias": bool(scored.path_angles[index] >= resolved_config.hard_alias_step_rad),
+            "unwrapped_rate_angle_rad": float(details.path_angles[index]),
+            "near_alias": bool(details.path_angles[index] >= resolved_config.near_alias_step_rad),
+            "hard_alias": bool(details.path_angles[index] >= resolved_config.hard_alias_step_rad),
         }
         if data.time_s is not None:
             row["time_start_s"] = float(data.time_s[index])

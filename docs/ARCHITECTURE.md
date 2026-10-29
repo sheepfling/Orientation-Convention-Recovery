@@ -57,3 +57,9 @@ connections for structural duals and clock-scale gauges. Prefix evidence uses
 cumulative residual energy under one fixed noise scale; this preserves the
 documented fixed-noise likelihood contrast while avoiding repeated rescoring of
 each earlier interval.
+
+Normal inference retains a candidate's result and residual rotation vectors, but
+not its decoded rates, interval durations, predicted/observed rotations, or path
+angles. Overall and per-interval diagnostics recompute the selected candidate's
+large arrays on demand. This reduces memory across a broad search at a modest
+runtime cost; see [the performance baseline](PERFORMANCE.md).

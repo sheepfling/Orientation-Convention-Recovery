@@ -29,9 +29,9 @@ implementation consistency, not recovery accuracy on outside data.
 
 ## Next engineering gates
 
-1. Benchmark full inference latency and peak memory at several sample counts
-   and search-space sizes. Keep a regression baseline and make the per-candidate
-   score storage compact before promising long-log support.
+1. Extend the [initial performance baseline](PERFORMANCE.md) to larger logs,
+   Euler searches, process RSS, and cold starts. Keep the per-candidate score
+   storage compact and avoid promising long-log support until measured.
 2. Review nested mutability in frozen configuration, profile, packet, and report
    models. Preserve Pydantic serialization while preventing caller mutations
    from changing a previously validated result.

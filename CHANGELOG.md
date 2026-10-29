@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reduced retained per-candidate diagnostic arrays, added a repeatable inference
+  benchmark, and extended strict Pyright coverage to development scripts.
 - Made the auto-fix sequence idempotent by stripping scope markers before Ruff formatting,
   and made CI check Ruff formatting on a temporary marker-free copy.
 - Added independent-corpus evaluation and a wheel-from-sdist distribution smoke test.
