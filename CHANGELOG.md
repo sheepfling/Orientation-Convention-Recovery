@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Separated exact symmetry grouping and data/prior ranking from inference
+  orchestration, with a bounded-period regression for scale equivalence.
 - Stored per-candidate squared residual energies instead of full residual vectors,
   retaining detailed vectors only when diagnostics require them.
 - Reused increment-prefix rotations across scoring windows and replaced per-interval

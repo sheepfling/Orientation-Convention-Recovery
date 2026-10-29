@@ -144,6 +144,41 @@ def test_rate_unit_and_period_share_an_exact_gauge_without_timestamps() -> None:
 ####
 
 
+def test_period_bound_breaks_rate_unit_scale_equivalence() -> None:
+    time_s = np.arange(81, dtype=np.float64) * 0.025
+    timed = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s, 0.7), _truth())
+    data = TrajectoryData(
+        representation=timed.representation,
+        orientation=timed.orientation,
+        rates=timed.rates,
+        time_s=None,
+    )
+    config = InferenceConfig(
+        search_space=SearchSpace(
+            attitude_directions=(AttitudeDirection.BODY_TO_WORLD,),
+            quaternion_orders=(QuaternionOrder.SCALAR_LAST,),
+            rate_frames=(RateFrame.BODY,),
+            rate_orders=("pqr",),
+            rate_units=tuple(RateUnit),
+            rate_signs=(1,),
+        ),
+        inferred_sample_period_bounds_s=(1.0e-6, 0.5),
+    )
+
+    report = infer_conventions(data, config)
+    radians = next(
+        item for item in report.rankings if item.hypothesis.rate_unit is RateUnit.RADIANS_PER_SECOND
+    )
+    degrees = next(
+        item for item in report.rankings if item.hypothesis.rate_unit is RateUnit.DEGREES_PER_SECOND
+    )
+
+    assert degrees.inferred_sample_period_s == pytest.approx(0.5)
+    assert radians.inferred_sample_period_s == pytest.approx(0.025, rel=5.0e-3)
+    assert radians.equivalence_class_id != degrees.equivalence_class_id
+####
+
+
 def test_direction_dual_and_rate_scale_gauge_form_one_transitive_class() -> None:
     time_s = np.arange(81, dtype=np.float64) * 0.025
     timed = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s, 0.7), _truth())

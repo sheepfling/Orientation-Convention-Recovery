@@ -16,8 +16,9 @@ coercion -> models -> hypotheses
                     |-- scoring
                     |    |-- core (kinematics)
                     |    `-- heuristics (non-evidence)
+                    |-- equivalence -> ranking
                     |-- statistics (evidence summaries)
-                    `-- ranking, policy, report
+                    `-- policy, report
 ```
 
 ## Module responsibilities
@@ -33,7 +34,9 @@ coercion -> models -> hypotheses
 | `heuristics.py` | Euler range/branch, gimbal, and visible-wrap diagnostics                                                        | Trajectory-fit evidence               |
 | `statistics.py` | Excitation rank and residual-noise summaries                                                                    | Operational representative selection  |
 | `scoring.py`    | Complete- and partial-stream candidate scoring, with optional interval diagnostics                              | Class ranking and policy selection    |
-| `inference.py`  | Scoring orchestration, equivalence handling, ranking, policy selection, and report assembly                     | CSV parsing and model validation      |
+| `equivalence.py` | Exact observational symmetry and scale-gauge grouping                                                           | Soft priors or representative policy  |
+| `ranking.py`   | Data ranks, soft-prior support weights, and deterministic tie ordering                                           | Operational class selection           |
+| `inference.py` | Scoring orchestration, evidence sufficiency, operational policy, and report assembly                             | CSV parsing and model validation      |
 | `io.py`         | CSV/config/report serialization and layout detection                                                            | Candidate scoring                     |
 | `fusion.py`     | Cross-trajectory evidence fusion                                                                                | Single-trajectory convention decoding |
 
@@ -48,8 +51,10 @@ Heuristic features are allowed to explain representation behavior, but they do
 not become trajectory evidence. `core.py` produces decoded kinematic quantities;
 `heuristics.py` describes non-identifying representation behavior;
 `scoring.py` computes candidate-level fit and representation diagnostics;
-`statistics.py` summarizes excitation and residual processes; and `inference.py`
-combines those inputs according to the documented evidence and policy rules.
+`equivalence.py` groups exact observational symmetries; `ranking.py` assigns
+data and soft-prior ranks; `statistics.py` summarizes excitation and residual
+processes; and `inference.py` combines those inputs according to the documented
+evidence and policy rules.
 
 `TrajectoryData` owns read-only copies of validated input arrays, so later caller
 mutations cannot change a result. Exact quotient grouping uses disjoint-set
