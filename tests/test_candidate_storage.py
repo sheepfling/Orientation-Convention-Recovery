@@ -12,9 +12,7 @@ from attitude_convention_inference import (
     best_interval_diagnostics,
     infer_conventions,
 )
-from attitude_convention_inference.inference import (
-    _score_hypothesis,  # pyright: ignore[reportPrivateUsage]
-)
+from attitude_convention_inference.scoring import score_hypothesis
 from scripts.generate_validation_corpus import analytic_motion
 
 
@@ -30,8 +28,8 @@ def test_full_scoring_retains_interval_details_only_on_request() -> None:
     report = infer_conventions(data, config)
     hypothesis = report.best.hypothesis
 
-    compact = _score_hypothesis(data, hypothesis, config)
-    detailed = _score_hypothesis(data, hypothesis, config, retain_interval_details=True)
+    compact = score_hypothesis(data, hypothesis, config)
+    detailed = score_hypothesis(data, hypothesis, config, retain_interval_details=True)
 
     assert compact.interval_details is None
     assert detailed.interval_details is not None

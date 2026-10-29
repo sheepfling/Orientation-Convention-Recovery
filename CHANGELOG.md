@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Separated candidate scoring from evidence-class ranking and policy selection,
+  keeping strict typing and the public inference API unchanged.
 - Made nested maps in frozen configuration, profile, packet, and report models
   read-only snapshots without changing Pydantic JSON output; normalized nested
   hypotheses and prior keys through every construction path.

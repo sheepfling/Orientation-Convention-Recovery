@@ -13,13 +13,11 @@ coercion -> models -> hypotheses
                          |
                          v
                     inference engine
-                    /      |       \\
-                   /       |        \\
-             core      heuristics  statistics
-          (kinematics) (non-evidence) (evidence summaries)
-                   \\       |        /
-                    \\      |       /
-                         report
+                    |-- scoring
+                    |    |-- core (kinematics)
+                    |    `-- heuristics (non-evidence)
+                    |-- statistics (evidence summaries)
+                    `-- ranking, policy, report
 ```
 
 ## Module responsibilities
@@ -34,7 +32,8 @@ coercion -> models -> hypotheses
 | `math_utils.py` | Small NumPy/SciPy adapters and reusable numerical transforms                                                    | Domain decisions                      |
 | `heuristics.py` | Euler range/branch, gimbal, and visible-wrap diagnostics                                                        | Trajectory-fit evidence               |
 | `statistics.py` | Excitation rank and residual-noise summaries                                                                    | Operational representative selection  |
-| `inference.py`  | Evidence-preserving scoring orchestration, equivalence handling, ranking, policy selection, and report assembly | CSV parsing and model validation      |
+| `scoring.py`    | Complete- and partial-stream candidate scoring, with optional interval diagnostics                              | Class ranking and policy selection    |
+| `inference.py`  | Scoring orchestration, equivalence handling, ranking, policy selection, and report assembly                     | CSV parsing and model validation      |
 | `io.py`         | CSV/config/report serialization and layout detection                                                            | Candidate scoring                     |
 | `fusion.py`     | Cross-trajectory evidence fusion                                                                                | Single-trajectory convention decoding |
 
@@ -48,9 +47,9 @@ keeps the public API readable while making the mechanics reusable and testable.
 Heuristic features are allowed to explain representation behavior, but they do
 not become trajectory evidence. `core.py` produces decoded kinematic quantities;
 `heuristics.py` describes non-identifying representation behavior;
+`scoring.py` computes candidate-level fit and representation diagnostics;
 `statistics.py` summarizes excitation and residual processes; and `inference.py`
-is responsible for combining those inputs according to the documented evidence
-and policy rules.
+combines those inputs according to the documented evidence and policy rules.
 
 `TrajectoryData` owns read-only copies of validated input arrays, so later caller
 mutations cannot change a result. Exact quotient grouping uses disjoint-set
