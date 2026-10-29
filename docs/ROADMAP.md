@@ -3,15 +3,19 @@
 The `0.0.1a0` tag is an alpha checkpoint. A green synthetic test suite establishes
 implementation consistency, not recovery accuracy on outside data.
 
-## Current work
+## Current engineering baseline
 
-- Keep `scripts/ci.py --fix` repeatable and make the normal CI path check Ruff
-  formatting on a temporary copy without scope markers.
-- Build an sdist and a wheel from it, validate both with Twine, and smoke-test
-  the installed wheel outside the checkout on Python 3.11/3.12 and Linux/Windows.
-- Measure recovery, ambiguity, and misses with the analytic synthetic corpus and
-  the same evaluator intended for independently labeled logs.
-- Reduce avoidable quadratic work in exact-class grouping and evidence prefixes.
+- `scripts/ci.py --fix` and check-only CI pass locally, including strict Pyright,
+  Ruff formatting on marker-free copies, and scope markers restored last.
+- The sdist-to-wheel build, Twine check, and installed-wheel smoke test pass on
+  local Windows/Python 3.14. The Python 3.11/3.12 Linux/Windows matrix remains a
+  separate release gate.
+- The analytic synthetic corpus has labeled recovery/ambiguity/miss evaluation;
+  it is not evidence of recovery accuracy on independent systems.
+- Exact-class grouping and evidence prefixes avoid known quadratic paths.
+- [Performance baselines](PERFORMANCE.md) include 10,001-sample compact and
+  48-hypothesis quaternion searches, plus 576-hypothesis Euler searches through
+  501 samples with isolated-process peak memory and cold-call timing.
 
 ## Next evidence gates
 
@@ -29,9 +33,9 @@ implementation consistency, not recovery accuracy on outside data.
 
 ## Next engineering gates
 
-1. Extend the [initial performance baseline](PERFORMANCE.md) to larger logs,
-   Euler searches, process RSS, and cold starts. Keep the per-candidate score
-   storage compact and avoid promising long-log support until measured.
+1. Profile longer broad Euler searches and memory growth across supported Python,
+   NumPy, and SciPy versions. Keep per-candidate score storage compact and avoid
+   promising long-log support until repeated measurements justify it.
 2. Split the large `models.py` and `inference.py` modules along the architecture
    spine, with stable public imports and focused tests for each moved contract.
 3. Confirm the release matrix passes on GitHub, then test an actual `0.0.1`

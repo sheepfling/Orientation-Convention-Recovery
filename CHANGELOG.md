@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added Euler benchmark workloads and fresh-process cold-start/peak-memory
+  measurements; limited decoded-attitude retention to the current convention group.
 - Separated candidate scoring from evidence-class ranking and policy selection,
   keeping strict typing and the public inference API unchanged.
 - Made nested maps in frozen configuration, profile, packet, and report models

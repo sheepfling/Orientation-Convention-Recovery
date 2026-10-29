@@ -1167,7 +1167,10 @@ def infer_trajectory_conventions(
 
     scored: list[_ScoredCandidate] = []
     failures: list[str] = []
-    attitude_cache: dict[tuple[object, ...], Rotation] = {}
+    # Hypotheses are grouped by attitude convention. Retain only the current
+    # decoded rotation series instead of every Euler variant on a long log.
+    current_attitude_key: tuple[object, ...] | None = None
+    current_attitudes: Rotation | None = None
     rate_cache: dict[tuple[object, ...], FloatArray] = {}
 
     for hypothesis in hypotheses:
@@ -1179,8 +1182,9 @@ def infer_trajectory_conventions(
                 hypothesis.euler_mode,
                 hypothesis.angle_unit,
             )
-            if attitude_key not in attitude_cache:
-                attitude_cache[attitude_key] = decode_attitudes(data, hypothesis)
+            if current_attitudes is None or attitude_key != current_attitude_key:
+                current_attitudes = decode_attitudes(data, hypothesis)
+                current_attitude_key = attitude_key
             ####
 
             rate_key = (hypothesis.rate_order, hypothesis.rate_unit, hypothesis.rate_sign)
@@ -1193,7 +1197,7 @@ def infer_trajectory_conventions(
                     data,
                     hypothesis,
                     resolved_config,
-                    attitudes=attitude_cache[attitude_key],
+                    attitudes=current_attitudes,
                     rates_rad_s=rate_cache[rate_key],
                 )
             )
