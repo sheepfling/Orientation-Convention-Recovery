@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Separated shared model types and search contracts into dedicated modules
+  while preserving the established `models.py` import surface.
 - Separated exact symmetry grouping and data/prior ranking from inference
   orchestration, with a bounded-period regression for scale equivalence.
 - Stored per-candidate squared residual energies instead of full residual vectors,

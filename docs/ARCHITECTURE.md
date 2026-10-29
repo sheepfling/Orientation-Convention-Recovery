@@ -9,7 +9,9 @@ evidence and policy.
 public API / CLI
        |
        v
-coercion -> models -> hypotheses
+coercion -> models facade -> hypotheses
+               |-- model_common (enums / validation)
+               `-- search_models (search / constraints)
                          |
                          v
                     inference engine
@@ -25,7 +27,9 @@ coercion -> models -> hypotheses
 
 | Module          | Responsibility                                                                                                  | Must not own                          |
 |-----------------|-----------------------------------------------------------------------------------------------------------------|---------------------------------------|
-| `models.py`     | Typed domain contracts, validation, and serialized report models                                                | Numerical scoring or file I/O         |
+| `model_common.py` | Shared enums, Pydantic model behavior, and normalization helpers                                               | Search policy or reports              |
+| `search_models.py` | Typed search space and hard constraints                                                                        | Data-dependent evidence               |
+| `models.py`     | Priors, hypotheses, report contracts, and stable re-exports of common/search models                             | Numerical scoring or file I/O         |
 | `immutable.py`  | Copied read-only mappings with Pydantic-compatible serialization                                                | Domain-specific validation            |
 | `coercion.py`   | Mapping/array-facing input coercion for the convenience API                                                     | Convention search or trajectory math  |
 | `hypotheses.py` | Search dimensions and normalized hypothesis generation                                                          | Data-dependent evidence               |
@@ -65,6 +69,7 @@ each earlier interval.
 
 Frozen configuration, profile, packet, and report models copy their mapping fields
 into read-only views, including the inner maps in a hypothesis-space summary.
+`model_common.py` owns their shared Pydantic-facing behavior;
 `immutable.py` supplies the serializer that converts those views back to ordinary
 JSON objects, so `model_dump_json()` and generated validation schemas stay usable.
 Callers can edit a dumped dictionary without changing the model it came from.

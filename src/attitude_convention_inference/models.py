@@ -1,17 +1,37 @@
-"""Validated domain models and serialized inference report contracts."""
+"""Validated policy, hypothesis, and report models with stable public re-exports."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import field, fields, replace
-from enum import Enum, StrEnum
+from collections.abc import Callable, Mapping
+from dataclasses import field
 from math import isfinite, pi
-from typing import Any, Literal, Self, TypeVar, cast
+from typing import Any, Literal, Self, cast
 
-from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass
 
 from .immutable import ReadOnlyMapping, freeze_mapping, freeze_nested_mapping
+from .model_common import (
+    PRIOR_FIELDS,
+    AngleUnit,
+    AttitudeDirection,
+    AttitudeRepresentation,
+    ConfidenceLabel,
+    DimensionStatus,
+    EulerMode,
+    FrozenModel,
+    QuaternionOrder,
+    RateFrame,
+    RateUnit,
+    ResultLabel,
+    WrapUnitStatus,
+    angle_unit_scale,
+    enum_value,
+    normalize_euler_orders,
+    normalize_rate_orders,
+    normalize_signs,
+    validated_payload,
+)
+from .search_models import ConventionConstraints, SearchSpace
 
 __all__ = [
     "AngleUnit",
@@ -43,466 +63,6 @@ __all__ = [
     "angle_unit_scale",
 ]
 
-EULER_ORDERS: tuple[str, ...] = (
-    # Tait--Bryan sequences (all three axes distinct).
-    "xyz",
-    "xzy",
-    "yxz",
-    "yzx",
-    "zxy",
-    "zyx",
-    # Proper-Euler sequences (first and third axes repeated).
-    "xyx",
-    "xzx",
-    "yxy",
-    "yzy",
-    "zxz",
-    "zyz",
-)
-RATE_ORDERS: tuple[str, ...] = ("pqr", "prq", "qpr", "qrp", "rpq", "rqp")
-_CONSTRAINT_FIELDS: tuple[str, ...] = (
-    "attitude_direction",
-    "quaternion_order",
-    "euler_order",
-    "euler_mode",
-    "angle_unit",
-    "rate_frame",
-    "rate_order",
-    "rate_unit",
-    "rate_sign",
-)
-_PRIOR_FIELDS: tuple[str, ...] = _CONSTRAINT_FIELDS
-T = TypeVar("T")
-EnumT = TypeVar("EnumT", bound=Enum)
-
-
-class AttitudeRepresentation(StrEnum):
-    EULER = "euler"
-    QUATERNION = "quaternion"
-####
-
-
-class AttitudeDirection(StrEnum):
-    BODY_TO_WORLD = "body_to_world"
-    WORLD_TO_BODY = "world_to_body"
-####
-
-
-class QuaternionOrder(StrEnum):
-    SCALAR_FIRST = "scalar_first"
-    SCALAR_LAST = "scalar_last"
-####
-
-
-class EulerMode(StrEnum):
-    INTRINSIC = "intrinsic"
-    EXTRINSIC = "extrinsic"
-####
-
-
-class AngleUnit(StrEnum):
-    RADIANS = "radians"
-    DEGREES = "degrees"
-    TURNS = "turns"
-    GRADS = "grads"
-####
-
-
-def angle_unit_scale(unit: AngleUnit) -> float:
-    """Convert one raw angle unit to radians."""
-
-    return {
-        AngleUnit.RADIANS: 1.0,
-        AngleUnit.DEGREES: pi / 180.0,
-        AngleUnit.TURNS: 2.0 * pi,
-        AngleUnit.GRADS: pi / 200.0,
-    }[unit]
-####
-
-
-class RateFrame(StrEnum):
-    BODY = "body"
-    WORLD = "world"
-####
-
-
-class RateUnit(StrEnum):
-    RADIANS_PER_SECOND = "radians_per_second"
-    DEGREES_PER_SECOND = "degrees_per_second"
-####
-
-
-class ConfidenceLabel(StrEnum):
-    HIGH = "high"
-    MODERATE = "moderate"
-    LOW = "low"
-    INDETERMINATE = "indeterminate"
-####
-
-
-class ResultLabel(StrEnum):
-    TRAJECTORY_QUOTIENT = "trajectory-quotient"
-    TRAJECTORY_CLASS = "trajectory-quotient"
-    SCALE_GAUGE = "scale-gauge"
-    ORDER_PARTIAL = "order-partial"
-    OVERFIT_NON_ID = "overfit/non-ID"
-    ATTITUDE_HEURISTIC = "attitude-heuristic"
-    RATE_EXTERNAL = "rate-external"
-    RATE_NON_ID = "rate-non-ID"
-    NO_DATA = "no-data"
-####
-
-
-class WrapUnitStatus(StrEnum):
-    NOT_APPLICABLE = "not-applicable"
-    UNIT_UNDETERMINED_BY_WRAP = "unit-undetermined-by-wrap"
-    UNIT_SUGGESTED_BY_WRAP = "unit-suggested-by-wrap"
-####
-
-
-class DimensionStatus(StrEnum):
-    FIXED = "fixed"
-    INFERRED = "inferred"
-    AMBIGUOUS = "ambiguous"
-    NOT_APPLICABLE = "not_applicable"
-####
-
-
-class FrozenModel:
-    """Shared Pydantic-backed behavior for immutable domain dataclasses."""
-
-    @classmethod
-    def model_validate(cls: type[Self], value: Any) -> Self:
-        return TypeAdapter(cls).validate_python(value)
-    ####
-
-    def model_dump(self, *, mode: Literal["python", "json"] = "python") -> dict[str, Any]:
-        if mode not in ("python", "json"):
-            raise ValueError("mode must be 'python' or 'json'.")
-        ####
-        converted = TypeAdapter(type(self)).dump_python(self, mode=mode)
-        return cast(dict[str, Any], converted)
-    ####
-
-    def model_dump_json(self, *, indent: int | None = None) -> str:
-        return TypeAdapter(type(self)).dump_json(self, indent=indent).decode("utf-8")
-    ####
-
-    @classmethod
-    def model_json_schema(cls) -> dict[str, Any]:
-        """Return the JSON Schema generated from the Pydantic dataclass."""
-
-        return TypeAdapter(cls).json_schema()
-    ####
-
-    def model_copy(self: Self, *, update: Mapping[str, object] | None = None) -> Self:
-        return cast(Self, replace(cast(Any, self), **dict(update or {})))
-    ####
-####
-
-
-def _as_tuple(value: T | Sequence[T] | set[T] | None) -> tuple[T, ...] | None:
-    if value is None:
-        return None
-    ####
-    if isinstance(value, (str, bytes, Enum)) or not isinstance(value, (Sequence, set)):
-        return (cast(T, value),)
-    ####
-    if isinstance(value, set):
-        return tuple(cast(set[T], value))
-    ####
-    return tuple(cast(Sequence[T], value))
-####
-
-
-def _enum_value(enum_type: type[EnumT], value: EnumT | str) -> EnumT:
-    return value if isinstance(value, enum_type) else enum_type(value)
-####
-
-
-def _enum_tuple(
-    enum_type: type[EnumT],
-    value: EnumT | str | Sequence[EnumT | str],
-) -> tuple[EnumT, ...]:
-    raw = _as_tuple(value)
-    if raw is None:
-        raise ValueError("A non-empty value is required.")
-    ####
-    return tuple(_enum_value(enum_type, item) for item in raw)
-####
-
-
-def _validate_nonempty_unique(value: tuple[object, ...], label: str) -> None:
-    if not value:
-        raise ValueError(f"{label} may not be empty.")
-    ####
-    if len(set(value)) != len(value):
-        raise ValueError(f"{label} may not contain duplicates.")
-    ####
-####
-
-
-def _normalize_euler_orders(value: Sequence[str]) -> tuple[str, ...]:
-    normalized = tuple(str(order).lower() for order in value)
-    for order in normalized:
-        if (
-            len(order) != 3
-            or any(axis not in "xyz" for axis in order)
-            or order[0] == order[1]
-            or order[1] == order[2]
-        ):
-            raise ValueError(f"Euler order {order!r} is not a valid three-axis Euler sequence.")
-        ####
-    ####
-    return normalized
-####
-
-
-def _normalize_rate_orders(value: Sequence[str]) -> tuple[str, ...]:
-    normalized = tuple(str(order).lower() for order in value)
-    for order in normalized:
-        if len(order) != 3 or set(order) != {"p", "q", "r"}:
-            raise ValueError(f"Rate order {order!r} is not a p/q/r permutation.")
-        ####
-    ####
-    return normalized
-####
-
-
-def _normalize_signs(value: Sequence[int | str]) -> tuple[Literal[-1, 1], ...]:
-    signs = tuple(int(item) for item in value)
-    for sign in signs:
-        if sign not in (-1, 1):
-            raise ValueError("Rate signs must be either -1 or 1.")
-        ####
-    ####
-    return cast(tuple[Literal[-1, 1], ...], signs)
-####
-
-
-@dataclass(frozen=True, slots=True)
-class SearchSpace(FrozenModel):
-    attitude_directions: tuple[AttitudeDirection, ...] = (
-        AttitudeDirection.BODY_TO_WORLD,
-        AttitudeDirection.WORLD_TO_BODY,
-    )
-    quaternion_orders: tuple[QuaternionOrder, ...] = (
-        QuaternionOrder.SCALAR_FIRST,
-        QuaternionOrder.SCALAR_LAST,
-    )
-    euler_orders: tuple[str, ...] = EULER_ORDERS
-    euler_modes: tuple[EulerMode, ...] = (EulerMode.INTRINSIC, EulerMode.EXTRINSIC)
-    angle_units: tuple[AngleUnit, ...] = (AngleUnit.RADIANS,)
-    rate_frames: tuple[RateFrame, ...] = (RateFrame.BODY, RateFrame.WORLD)
-    rate_orders: tuple[str, ...] = RATE_ORDERS
-    rate_units: tuple[RateUnit, ...] = (RateUnit.RADIANS_PER_SECOND,)
-    rate_signs: tuple[Literal[-1, 1], ...] = (1,)
-
-    @classmethod
-    def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        payload = _validated_payload(cls, value)
-        enum_fields: tuple[tuple[str, type[Enum]], ...] = (
-            ("attitude_directions", AttitudeDirection),
-            ("quaternion_orders", QuaternionOrder),
-            ("euler_modes", EulerMode),
-            ("angle_units", AngleUnit),
-            ("rate_frames", RateFrame),
-            ("rate_units", RateUnit),
-        )
-        for name, enum_type in enum_fields:
-            if name in payload:
-                payload[name] = _enum_tuple(enum_type, payload[name])
-            ####
-        ####
-        if "euler_orders" in payload:
-            payload["euler_orders"] = _normalize_euler_orders(tuple(payload["euler_orders"]))
-        ####
-        if "rate_orders" in payload:
-            payload["rate_orders"] = _normalize_rate_orders(tuple(payload["rate_orders"]))
-        ####
-        if "rate_signs" in payload:
-            payload["rate_signs"] = _normalize_signs(tuple(payload["rate_signs"]))
-        ####
-        return cls(**payload)
-    ####
-
-    def __post_init__(self) -> None:
-        for item in fields(self):
-            _validate_nonempty_unique(tuple(getattr(self, item.name)), "Search-space fields")
-        ####
-        _normalize_euler_orders(tuple(str(item) for item in self.euler_orders))
-        _normalize_rate_orders(tuple(str(item) for item in self.rate_orders))
-        for name, enum_type in (
-            ("attitude_directions", AttitudeDirection),
-            ("quaternion_orders", QuaternionOrder),
-            ("euler_modes", EulerMode),
-            ("angle_units", AngleUnit),
-            ("rate_frames", RateFrame),
-            ("rate_units", RateUnit),
-        ):
-            for value in getattr(self, name):
-                enum_type(value)
-            ####
-        ####
-        _normalize_signs(tuple(self.rate_signs))
-    ####
-####
-
-
-@dataclass(frozen=True, slots=True)
-class ConventionConstraints(FrozenModel):
-    """Hard constraints layered on top of :class:`SearchSpace`.
-
-    A scalar locks a dimension, a sequence retains an allowed subset, and ``None``
-    leaves the dimension unknown.
-    """
-
-    attitude_direction: tuple[AttitudeDirection, ...] | AttitudeDirection | str | None = None
-    quaternion_order: tuple[QuaternionOrder, ...] | QuaternionOrder | str | None = None
-    euler_order: tuple[str, ...] | str | None = None
-    euler_mode: tuple[EulerMode, ...] | EulerMode | str | None = None
-    angle_unit: tuple[AngleUnit, ...] | AngleUnit | str | None = None
-    rate_frame: tuple[RateFrame, ...] | RateFrame | str | None = None
-    rate_order: tuple[str, ...] | str | None = None
-    rate_unit: tuple[RateUnit, ...] | RateUnit | str | None = None
-    rate_sign: tuple[Literal[-1, 1], ...] | Literal[-1, 1] | str | None = None
-
-    @classmethod
-    def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        payload = _validated_payload(cls, value)
-        enum_fields: tuple[tuple[str, type[Enum]], ...] = (
-            ("attitude_direction", AttitudeDirection),
-            ("quaternion_order", QuaternionOrder),
-            ("euler_mode", EulerMode),
-            ("angle_unit", AngleUnit),
-            ("rate_frame", RateFrame),
-            ("rate_unit", RateUnit),
-        )
-        for name, enum_type in enum_fields:
-            if payload.get(name) is not None:
-                payload[name] = _enum_tuple(enum_type, payload[name])
-            ####
-        ####
-        if payload.get("euler_order") is not None:
-            payload["euler_order"] = _normalize_euler_orders(
-                tuple(str(item) for item in _as_tuple(payload["euler_order"]) or ())
-            )
-        ####
-        if payload.get("rate_order") is not None:
-            payload["rate_order"] = _normalize_rate_orders(
-                tuple(str(item) for item in _as_tuple(payload["rate_order"]) or ())
-            )
-        ####
-        if payload.get("rate_sign") is not None:
-            payload["rate_sign"] = _normalize_signs(
-                tuple(cast(int | str, item) for item in _as_tuple(payload["rate_sign"]) or ())
-            )
-        ####
-        return cls(**payload)
-    ####
-
-    def __post_init__(self) -> None:
-        for field_name in _CONSTRAINT_FIELDS:
-            value = getattr(self, field_name)
-            if value is not None:
-                _validate_nonempty_unique(tuple(_as_tuple(value) or ()), "Constraint fields")
-            ####
-        ####
-    ####
-
-    @staticmethod
-    def _intersect_values(
-        base: tuple[T, ...],
-        constrained: tuple[T, ...] | None,
-        dimension: str,
-    ) -> tuple[T, ...]:
-        if constrained is None:
-            return base
-        ####
-        allowed = set(_as_tuple(constrained) or ())
-        result = tuple(value for value in base if value in allowed)
-        if not result:
-            raise ValueError(
-                f"Constraint for {dimension!r} has no overlap with the configured search space."
-            )
-        ####
-        return result
-    ####
-
-    def apply(self, base: SearchSpace) -> SearchSpace:
-        return SearchSpace(
-            attitude_directions=self._intersect_values(
-                base.attitude_directions,
-                cast(tuple[AttitudeDirection, ...] | None, self.attitude_direction),
-                "attitude_direction",
-            ),
-            quaternion_orders=self._intersect_values(
-                base.quaternion_orders,
-                cast(tuple[QuaternionOrder, ...] | None, self.quaternion_order),
-                "quaternion_order",
-            ),
-            euler_orders=self._intersect_values(
-                base.euler_orders,
-                cast(tuple[str, ...] | None, self.euler_order),
-                "euler_order",
-            ),
-            euler_modes=self._intersect_values(
-                base.euler_modes,
-                cast(tuple[EulerMode, ...] | None, self.euler_mode),
-                "euler_mode",
-            ),
-            angle_units=self._intersect_values(
-                base.angle_units,
-                cast(tuple[AngleUnit, ...] | None, self.angle_unit),
-                "angle_unit",
-            ),
-            rate_frames=self._intersect_values(
-                base.rate_frames,
-                cast(tuple[RateFrame, ...] | None, self.rate_frame),
-                "rate_frame",
-            ),
-            rate_orders=self._intersect_values(
-                base.rate_orders,
-                cast(tuple[str, ...] | None, self.rate_order),
-                "rate_order",
-            ),
-            rate_units=self._intersect_values(
-                base.rate_units,
-                cast(tuple[RateUnit, ...] | None, self.rate_unit),
-                "rate_unit",
-            ),
-            rate_signs=self._intersect_values(
-                base.rate_signs,
-                cast(tuple[Literal[-1, 1], ...] | None, self.rate_sign),
-                "rate_sign",
-            ),
-        )
-    ####
-
-    def intersect(self, other: ConventionConstraints) -> ConventionConstraints:
-        updates: dict[str, tuple[object, ...] | None] = {}
-        for field_name in _CONSTRAINT_FIELDS:
-            left = cast(tuple[object, ...] | None, getattr(self, field_name))
-            right = cast(tuple[object, ...] | None, getattr(other, field_name))
-            if left is None:
-                updates[field_name] = right
-                continue
-            ####
-            if right is None:
-                updates[field_name] = left
-                continue
-            ####
-            right_values = set(right)
-            overlap = tuple(value for value in left if value in right_values)
-            if not overlap:
-                raise ValueError(f"Hard constraints for {field_name!r} are contradictory.")
-            ####
-            updates[field_name] = overlap
-        ####
-        return ConventionConstraints.model_validate(updates)
-    ####
-####
-
 
 def _prior_mapping(
     value: Mapping[Any, Any] | None,
@@ -523,19 +83,6 @@ def _prior_mapping(
         result[key] = weight
     ####
     return result
-####
-
-
-def _validated_payload(cls: type[T], value: T | Mapping[str, Any]) -> dict[str, Any]:
-    if isinstance(value, cls):
-        instance = cast(Any, value)
-        return {item.name: getattr(instance, item.name) for item in fields(instance)}
-    ####
-    if not isinstance(value, Mapping):
-        raise TypeError(f"{cls.__name__} requires a mapping or an existing instance.")
-    ####
-    mapping = cast(Mapping[str, Any], value)
-    return {key: item for key, item in mapping.items()}
 ####
 
 
@@ -569,28 +116,28 @@ class ConventionPriors(FrozenModel):
 
     @classmethod
     def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        return cls(**_validated_payload(cls, value))
+        return cls(**validated_payload(cls, value))
     ####
 
     def __post_init__(self) -> None:
         converters: tuple[tuple[str, Callable[[Any], Any], str], ...] = (
             (
                 "attitude_direction",
-                lambda item: _enum_value(AttitudeDirection, item),
+                lambda item: enum_value(AttitudeDirection, item),
                 "attitude_direction",
             ),
             (
                 "quaternion_order",
-                lambda item: _enum_value(QuaternionOrder, item),
+                lambda item: enum_value(QuaternionOrder, item),
                 "quaternion_order",
             ),
-            ("euler_order", lambda item: _normalize_euler_orders((str(item),))[0], "euler_order"),
-            ("euler_mode", lambda item: _enum_value(EulerMode, item), "euler_mode"),
-            ("angle_unit", lambda item: _enum_value(AngleUnit, item), "angle_unit"),
-            ("rate_frame", lambda item: _enum_value(RateFrame, item), "rate_frame"),
-            ("rate_order", lambda item: _normalize_rate_orders((str(item),))[0], "rate_order"),
-            ("rate_unit", lambda item: _enum_value(RateUnit, item), "rate_unit"),
-            ("rate_sign", lambda item: _normalize_signs((cast(int | str, item),))[0], "rate_sign"),
+            ("euler_order", lambda item: normalize_euler_orders((str(item),))[0], "euler_order"),
+            ("euler_mode", lambda item: enum_value(EulerMode, item), "euler_mode"),
+            ("angle_unit", lambda item: enum_value(AngleUnit, item), "angle_unit"),
+            ("rate_frame", lambda item: enum_value(RateFrame, item), "rate_frame"),
+            ("rate_order", lambda item: normalize_rate_orders((str(item),))[0], "rate_order"),
+            ("rate_unit", lambda item: enum_value(RateUnit, item), "rate_unit"),
+            ("rate_sign", lambda item: normalize_signs((cast(int | str, item),))[0], "rate_sign"),
         )
         for name, converter, label in converters:
             weights = cast(Mapping[Any, Any], getattr(self, name))
@@ -600,7 +147,7 @@ class ConventionPriors(FrozenModel):
     ####
 
     def configured_dimensions(self) -> tuple[str, ...]:
-        return tuple(field_name for field_name in _PRIOR_FIELDS if bool(getattr(self, field_name)))
+        return tuple(field_name for field_name in PRIOR_FIELDS if bool(getattr(self, field_name)))
     ####
 ####
 
@@ -615,7 +162,7 @@ class DomainPrior(FrozenModel):
 
     @classmethod
     def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        payload = _validated_payload(cls, value)
+        payload = validated_payload(cls, value)
         raw_weights: Any = payload.get("class_weights", {})
         if not isinstance(raw_weights, Mapping):
             raise ValueError("Domain prior class_weights must be a mapping.")
@@ -679,7 +226,7 @@ class PreferenceProfile(FrozenModel):
 
     @classmethod
     def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        payload = _validated_payload(cls, value)
+        payload = validated_payload(cls, value)
         payload["profile_id"] = str(payload.get("profile_id", "neutral-v1"))
         payload["source"] = str(payload.get("source", "package-default"))
 
@@ -778,7 +325,7 @@ class InferenceConfig(FrozenModel):
 
     @classmethod
     def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        payload = _validated_payload(cls, value)
+        payload = validated_payload(cls, value)
         if "search_space" in payload:
             payload["search_space"] = SearchSpace.model_validate(payload["search_space"])
         ####
@@ -936,7 +483,7 @@ class ConventionHypothesis(FrozenModel):
 
     @classmethod
     def model_validate(cls, value: Self | Mapping[str, Any]) -> Self:
-        return cls(**_validated_payload(cls, value))
+        return cls(**validated_payload(cls, value))
     ####
 
     def __post_init__(self) -> None:
@@ -950,13 +497,13 @@ class ConventionHypothesis(FrozenModel):
         ):
             value = getattr(self, name)
             if value is not None:
-                object.__setattr__(self, name, _enum_value(enum_type, value))
+                object.__setattr__(self, name, enum_value(enum_type, value))
             ####
         ####
-        object.__setattr__(self, "rate_order", _normalize_rate_orders((self.rate_order,))[0])
-        object.__setattr__(self, "rate_sign", _normalize_signs((self.rate_sign,))[0])
+        object.__setattr__(self, "rate_order", normalize_rate_orders((self.rate_order,))[0])
+        object.__setattr__(self, "rate_sign", normalize_signs((self.rate_sign,))[0])
         if self.euler_order is not None:
-            object.__setattr__(self, "euler_order", _normalize_euler_orders((self.euler_order,))[0])
+            object.__setattr__(self, "euler_order", normalize_euler_orders((self.euler_order,))[0])
         ####
 
         quaternion = self.quaternion_order is not None
