@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Separated policy configuration, convention hypotheses, and report contracts
+  into dedicated modules while keeping `models.py` as a compatibility facade.
 - Separated shared model types and search contracts into dedicated modules
   while preserving the established `models.py` import surface.
 - Separated exact symmetry grouping and data/prior ranking from inference

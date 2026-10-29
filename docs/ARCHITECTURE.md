@@ -11,7 +11,10 @@ public API / CLI
        v
 coercion -> models facade -> hypotheses
                |-- model_common (enums / validation)
-               `-- search_models (search / constraints)
+               |-- search_models (search / constraints)
+               |-- policy_models (priors / config)
+               |-- hypothesis_model (one convention)
+               `-- report_models (results / diagnostics)
                          |
                          v
                     inference engine
@@ -29,7 +32,10 @@ coercion -> models facade -> hypotheses
 |-----------------|-----------------------------------------------------------------------------------------------------------------|---------------------------------------|
 | `model_common.py` | Shared enums, Pydantic model behavior, and normalization helpers                                               | Search policy or reports              |
 | `search_models.py` | Typed search space and hard constraints                                                                        | Data-dependent evidence               |
-| `models.py`     | Priors, hypotheses, report contracts, and stable re-exports of common/search models                             | Numerical scoring or file I/O         |
+| `policy_models.py` | Priors, preference profiles, and inference configuration                                                      | Trajectory-fit evidence               |
+| `hypothesis_model.py` | One fully specified convention and its exact structural dual                                              | Candidate scoring                     |
+| `report_models.py` | Candidate results, diagnostics, and serialized inference reports                                               | Search policy or numerical scoring    |
+| `models.py`     | Stable re-exports for the established model import surface                                                      | New model implementations             |
 | `immutable.py`  | Copied read-only mappings with Pydantic-compatible serialization                                                | Domain-specific validation            |
 | `coercion.py`   | Mapping/array-facing input coercion for the convenience API                                                     | Convention search or trajectory math  |
 | `hypotheses.py` | Search dimensions and normalized hypothesis generation                                                          | Data-dependent evidence               |
