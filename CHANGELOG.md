@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split inference policy selection, evidence sufficiency, dimension assessments,
+  diagnostics, and report assembly into focused modules.
 - Separated policy configuration, convention hypotheses, and report contracts
   into dedicated modules while keeping `models.py` as a compatibility facade.
 - Separated shared model types and search contracts into dedicated modules

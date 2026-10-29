@@ -13,8 +13,9 @@ implementation consistency, not recovery accuracy on outside data.
 - The analytic synthetic corpus has labeled recovery/ambiguity/miss evaluation;
   it is not evidence of recovery accuracy on independent systems.
 - Exact-class grouping and evidence prefixes avoid known quadratic paths.
-- Exact symmetry grouping and data/prior ranking now have separate modules; the
-  remaining inference policy/report assembly still needs further separation.
+- Exact symmetry grouping, ranking, operational selection, evidence summaries,
+  dimension assessments, diagnostics, and report assembly now have separate
+  modules; `inference.py` orchestrates them.
 - Shared model primitives, search contracts, policy configuration, convention
   hypotheses, and report contracts now have separate modules with stable
   `models.py` re-exports.
@@ -41,8 +42,7 @@ implementation consistency, not recovery accuracy on outside data.
 1. Repeat broad Euler timing and memory measurements across supported Python,
    NumPy, and SciPy versions, including representative nonanalytic workloads.
    Avoid promising long-log support until repeated measurements justify it.
-2. Split the remaining policy/report assembly in `inference.py` along the
-   architecture spine. Preserve public imports and focused tests for each
-   moved contract.
+2. Compare public imports and serialized configuration/report contracts against
+   the alpha tag so the module moves do not silently change the library surface.
 3. Confirm the release matrix passes on GitHub, then test an actual `0.0.1`
    prerelease artifact on TestPyPI before a public package release.

@@ -22,8 +22,10 @@ coercion -> models facade -> hypotheses
                     |    |-- core (kinematics)
                     |    `-- heuristics (non-evidence)
                     |-- equivalence -> ranking
-                    |-- statistics (evidence summaries)
-                    `-- policy, report
+                    |-- selection (operational policy)
+                    |-- statistics -> evidence
+                    |-- assessments -> diagnostics
+                    `-- reporting
 ```
 
 ## Module responsibilities
@@ -46,7 +48,12 @@ coercion -> models facade -> hypotheses
 | `scoring.py`    | Complete- and partial-stream candidate scoring, with optional interval diagnostics                              | Class ranking and policy selection    |
 | `equivalence.py` | Exact observational symmetry and scale-gauge grouping                                                           | Soft priors or representative policy  |
 | `ranking.py`   | Data ranks, soft-prior support weights, and deterministic tie ordering                                           | Operational class selection           |
-| `inference.py` | Scoring orchestration, evidence sufficiency, operational policy, and report assembly                             | CSV parsing and model validation      |
+| `selection.py` | Class contender filtering and operational representative policy                                                 | Geometric scoring                     |
+| `evidence.py` | Fixed-noise evidence sufficiency and residual-noise estimates                                                   | Operational representative selection  |
+| `assessments.py` | Hypothesis-space and per-dimension assessments                                                                | Candidate scoring                     |
+| `diagnostics.py` | Overall and per-interval diagnostics                                                                          | Operational class selection           |
+| `reporting.py` | Final serialized report assembly                                                                                | Trajectory integration                |
+| `inference.py` | Scoring orchestration and stable inference/interval-diagnostic imports                                          | Policy and report implementation      |
 | `io.py`         | CSV/config/report serialization and layout detection                                                            | Candidate scoring                     |
 | `fusion.py`     | Cross-trajectory evidence fusion                                                                                | Single-trajectory convention decoding |
 
@@ -62,9 +69,10 @@ not become trajectory evidence. `core.py` produces decoded kinematic quantities;
 `heuristics.py` describes non-identifying representation behavior;
 `scoring.py` computes candidate-level fit and representation diagnostics;
 `equivalence.py` groups exact observational symmetries; `ranking.py` assigns
-data and soft-prior ranks; `statistics.py` summarizes excitation and residual
-processes; and `inference.py` combines those inputs according to the documented
-evidence and policy rules.
+data and soft-prior ranks; `selection.py` applies operational policy only after
+data contenders exist; `statistics.py` and `evidence.py` summarize excitation,
+residuals, and sufficiency; `assessments.py` and `diagnostics.py` explain the
+result; and `reporting.py` assembles the serialized contract.
 
 `TrajectoryData` owns read-only copies of validated input arrays, so later caller
 mutations cannot change a result. Exact quotient grouping uses disjoint-set
