@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import isfinite, pi
+from math import sqrt as scalar_sqrt
 from typing import Any, Protocol, cast
 
 import scipy.optimize as scipy_optimize
@@ -67,6 +68,7 @@ from .models import (
 
 __all__ = [
     "FloatArray",
+    "IncrementWindowComposer",
     "IntegratedIntervals",
     "IntervalDurationResolution",
     "QuaternionNormStatistics",
@@ -123,6 +125,74 @@ class WindowComposition:
 
     window_increments: Rotation
     starts: NDArray[int64]
+####
+
+
+@dataclass(frozen=True, slots=True)
+class IncrementWindowComposer:
+    """Reusable prefix products for noncommutative increment windows."""
+
+    prefix: Rotation
+    frame: RateFrame
+
+    @classmethod
+    def from_increments(
+        cls,
+        interval_increments: Rotation,
+        frame: RateFrame,
+    ) -> IncrementWindowComposer:
+        """Build one normalized scalar-last prefix stream for all window sizes."""
+
+        interval_count = len(interval_increments)
+        increment_quaternions = asarray(cast(Any, interval_increments).as_quat(), dtype=float64)
+        prefix_quaternions = empty((interval_count + 1, 4), dtype=float64)
+        prefix_quaternions[0] = (0.0, 0.0, 0.0, 1.0)
+        rx, ry, rz, rw = 0.0, 0.0, 0.0, 1.0
+        for index in range(interval_count):
+            ix = float(increment_quaternions[index, 0])
+            iy = float(increment_quaternions[index, 1])
+            iz = float(increment_quaternions[index, 2])
+            iw = float(increment_quaternions[index, 3])
+            if frame is RateFrame.BODY:
+                ax, ay, az, aw = rx, ry, rz, rw
+                bx, by, bz, bw = ix, iy, iz, iw
+            else:
+                ax, ay, az, aw = ix, iy, iz, iw
+                bx, by, bz, bw = rx, ry, rz, rw
+            ####
+            # Scalar-last Hamilton product in Rotation.__mul__ order.
+            nx = aw * bx + ax * bw + ay * bz - az * by
+            ny = aw * by - ax * bz + ay * bw + az * bx
+            nz = aw * bz + ax * by - ay * bx + az * bw
+            nw = aw * bw - ax * bx - ay * by - az * bz
+            # Keep the prefix on the unit sphere over long trajectories.
+            inverse_norm = 1.0 / scalar_sqrt(nx * nx + ny * ny + nz * nz + nw * nw)
+            rx, ry, rz, rw = (
+                nx * inverse_norm,
+                ny * inverse_norm,
+                nz * inverse_norm,
+                nw * inverse_norm,
+            )
+            prefix_quaternions[index + 1] = (rx, ry, rz, rw)
+        ####
+        return cls(prefix=rotation_from_quat(prefix_quaternions), frame=frame)
+    ####
+
+    def compose(self, window_size: int) -> WindowComposition:
+        """Compose every window of one size from the shared prefix rotations."""
+
+        interval_count = len(self.prefix) - 1
+        starts = arange(0, interval_count - window_size + 1, dtype=int64)
+        if starts.size == 0:
+            return WindowComposition(rotation_from_quat(empty((0, 4))), starts)
+        ####
+        left = self.prefix[starts]
+        right = self.prefix[starts + window_size]
+        if self.frame is RateFrame.BODY:
+            return WindowComposition(left.inv() * right, starts)
+        ####
+        return WindowComposition(right * left.inv(), starts)
+    ####
 ####
 
 
@@ -389,12 +459,15 @@ def _period_geometric_risk(
         frame,
         config.integration_substeps,
     )
+    window_composer = IncrementWindowComposer.from_increments(
+        integrated.predicted_increments, frame
+    )
     scale_risks: list[float] = []
     for window_size in config.window_sizes:
         if window_size > durations.size:
             continue
         ####
-        composition = compose_increment_windows(integrated.predicted_increments, window_size, frame)
+        composition = window_composer.compose(window_size)
         observed_windows = observed_window_increments(
             attitudes, composition.starts, window_size, frame
         )
@@ -541,36 +614,9 @@ def compose_increment_windows(
     window_size: int,
     frame: RateFrame,
 ) -> WindowComposition:
-    """Compose disjoint increment windows using cached prefix products.
+    """Compose one window size; use a composer to reuse prefixes across sizes."""
 
-    The previous implementation multiplied every increment inside every window,
-    making a window of length ``ell`` cost ``O(ell)``.  Prefix products reduce the
-    full pass to ``O(N)`` and each requested window to ``O(1)`` while preserving
-    the noncommutative body/world product order.
-    """
-
-    interval_count = len(interval_increments)
-    starts = arange(0, interval_count - window_size + 1, dtype=int64)
-    if starts.size == 0:
-        return WindowComposition(rotation_from_quat(empty((0, 4))), starts)
-    ####
-
-    prefix_quaternions = empty((interval_count + 1, 4), dtype=float64)
-    prefix_quaternions[0] = (0.0, 0.0, 0.0, 1.0)
-    running: Rotation = cast(Any, Rotation.identity())
-    for index in range(interval_count):
-        increment = interval_increments[index]
-        running = running * increment if frame is RateFrame.BODY else increment * running
-        prefix_quaternions[index + 1] = asarray(cast(Any, running).as_quat(), dtype=float64)
-    ####
-
-    prefix = rotation_from_quat(prefix_quaternions)
-    left = prefix[starts]
-    right = prefix[starts + window_size]
-    if frame is RateFrame.BODY:
-        return WindowComposition(left.inv() * right, starts)
-    ####
-    return WindowComposition(right * left.inv(), starts)
+    return IncrementWindowComposer.from_increments(interval_increments, frame).compose(window_size)
 ####
 
 

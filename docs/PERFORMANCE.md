@@ -85,5 +85,34 @@ changes cost. These are baselines, not performance guarantees or release limits.
 | euler-compact | Euler | 2 | 1.92 s | 93,646,848 B |
 | default | quaternion | 48 | 28.03 s | 105,869,312 B |
 
-The 576-hypothesis Euler search has only been measured here up to 501 samples;
-larger broad-search logs still need profiling before making a scale promise.
+## Shared prefix composition
+
+Profiling the 101-sample, 576-hypothesis Euler search showed that computing each
+window size rebuilt the same increment-prefix stream. The inference path now
+builds one prefix stream per candidate and reuses it for all window sizes. The
+prefix accumulator uses normalized scalar-last quaternion products instead of
+constructing a SciPy `Rotation` object for every interval. Direct-product tests
+cover body/world composition, several window sizes, and a 257-interval stream
+with large rotations.
+
+One-call timing comparisons on the same Windows/Python/NumPy/SciPy environment
+are below. The baseline range is from two single runs at commit `654e5a6`; the
+shared-prefix and scalar-prefix stages each had one run. They are diagnostic,
+not stable throughput promises.
+
+| Samples | Hypotheses | Prior timing | Shared prefix | Scalar prefix |
+|--------:|-----------:|-------------:|--------------:|--------------:|
+| 101 | 576 | 4.14–4.56 s | 2.03 s | 1.28 s |
+| 501 | 576 | 19.60–21.31 s | 8.71 s | 4.67 s |
+
+The final 2,001-sample, 576-hypothesis Euler run took 16.72 s for inference and
+18.26 s end to end in a fresh process, with a 122,363,904 B peak Windows working
+set. Traced peak allocation was 4,559,734 B. These are single-run figures; a
+10,001-sample broad Euler search and repeated cross-version measurements remain
+open before claiming a supported scale.
+
+The 10,001-sample, 48-hypothesis quaternion case took 3.38 s after this change,
+versus 28.03 s in the preceding baseline run. Peak working set was approximately
+unchanged (106,242,048 B versus 105,869,312 B). This speed comparison also comes
+from one run per version on one host, so it is a lead for further measurement,
+not a portable speedup guarantee.

@@ -12,8 +12,8 @@ from scipy.spatial.transform import Rotation
 
 from .core import (
     FloatArray,
+    IncrementWindowComposer,
     TrajectoryData,
-    compose_increment_windows,
     decode_attitudes,
     decode_rates,
     integrate_interval_increments,
@@ -109,15 +109,12 @@ def score_hypothesis(
     valid_windows = tuple(
         window for window in config.window_sizes if window <= data.sample_count - 1
     )
+    window_composer = IncrementWindowComposer.from_increments(predicted, frame)
     lag_metrics: list[LagMetric] = []
     scale_risks: list[ScaleRisk] = []
 
     for window_size in valid_windows:
-        composition = compose_increment_windows(
-            predicted,
-            window_size,
-            frame,
-        )
+        composition = window_composer.compose(window_size)
         observed_windows = observed_window_increments(
             attitudes,
             composition.starts,

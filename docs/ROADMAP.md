@@ -15,7 +15,7 @@ implementation consistency, not recovery accuracy on outside data.
 - Exact-class grouping and evidence prefixes avoid known quadratic paths.
 - [Performance baselines](PERFORMANCE.md) include 10,001-sample compact and
   48-hypothesis quaternion searches, plus 576-hypothesis Euler searches through
-  501 samples with isolated-process peak memory and cold-call timing.
+  2,001 samples with isolated-process peak memory and cold-call timing.
 
 ## Next evidence gates
 
@@ -33,7 +33,7 @@ implementation consistency, not recovery accuracy on outside data.
 
 ## Next engineering gates
 
-1. Profile longer broad Euler searches and memory growth across supported Python,
+1. Profile 10,001-sample broad Euler searches and memory growth across supported Python,
    NumPy, and SciPy versions. Keep per-candidate score storage compact and avoid
    promising long-log support until repeated measurements justify it.
 2. Split the large `models.py` and `inference.py` modules along the architecture

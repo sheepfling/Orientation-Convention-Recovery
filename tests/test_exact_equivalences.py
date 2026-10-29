@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
+from numpy import amax
 from scipy.spatial.transform import Rotation
 
 from attitude_convention_inference import (
@@ -18,7 +19,12 @@ from attitude_convention_inference import (
     SearchSpace,
     infer_conventions,
 )
-from attitude_convention_inference.core import FloatArray, TrajectoryData, compose_increment_windows
+from attitude_convention_inference.core import (
+    FloatArray,
+    IncrementWindowComposer,
+    TrajectoryData,
+    compose_increment_windows,
+)
 from attitude_convention_inference.synthetic import (
     SyntheticConvention,
     encode_synthetic_trajectory,
@@ -247,19 +253,53 @@ def test_prefix_window_products_match_direct_noncommutative_products(frame: Rate
         )
     )
 
-    accelerated = compose_increment_windows(increments, 3, frame)
-    expected: list[Rotation] = []
-    for start in accelerated.starts:
-        total = Rotation.identity()
-        for offset in range(3):
-            increment = increments[int(start + offset)]
-            total = total * increment if frame is RateFrame.BODY else increment * total
+    composer = IncrementWindowComposer.from_increments(increments, frame)
+    for window_size in (1, 2, 3, 6):
+        accelerated = composer.compose(window_size)
+        expected: list[Rotation] = []
+        for start in accelerated.starts:
+            total = Rotation.identity()
+            for offset in range(window_size):
+                increment = increments[int(start + offset)]
+                total = total * increment if frame is RateFrame.BODY else increment * total
+            ####
+            expected.append(total)
         ####
-        expected.append(total)
-    ####
 
-    assert _quaternions(accelerated.window_increments) == pytest.approx(
-        _quaternions(cast(Rotation, cast(Any, Rotation).concatenate(expected))),
-        abs=1.0e-12,
-    )
+        assert _quaternions(accelerated.window_increments) == pytest.approx(
+            _quaternions(cast(Rotation, cast(Any, Rotation).concatenate(expected))),
+            abs=1.0e-12,
+        )
+        one_shot = compose_increment_windows(increments, window_size, frame)
+        assert _quaternions(one_shot.window_increments) == pytest.approx(
+            _quaternions(accelerated.window_increments), abs=1.0e-12
+        )
+    ####
+####
+
+
+@pytest.mark.parametrize("frame", tuple(RateFrame))
+def test_long_prefix_products_match_direct_rotations(frame: RateFrame) -> None:
+    rng = np.random.default_rng(804)
+    vectors = rng.normal(size=(257, 3)) * 0.45
+    vectors[::23] *= 6.0
+    increments = _from_rotvec(np.asarray(vectors, dtype=np.float64))
+    composer = IncrementWindowComposer.from_increments(increments, frame)
+
+    for window_size in (1, 8, 31, 257):
+        accelerated = composer.compose(window_size)
+        expected: list[Rotation] = []
+        for start in accelerated.starts:
+            total = Rotation.identity()
+            for offset in range(window_size):
+                increment = increments[int(start + offset)]
+                total = total * increment if frame is RateFrame.BODY else increment * total
+            ####
+            expected.append(total)
+        ####
+        direct = cast(Rotation, cast(Any, Rotation).concatenate(expected))
+        disagreement = accelerated.window_increments.inv() * direct
+        angles = np.asarray(cast(Any, disagreement).magnitude(), dtype=np.float64)
+        assert amax(angles) < 1.0e-11
+    ####
 ####
