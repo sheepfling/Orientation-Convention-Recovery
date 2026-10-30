@@ -571,6 +571,10 @@ For an explicit result that can abstain, inspect `report.decision`. It recommend
 class only when the evidence threshold is met and exactly one data-only contender
 remains; soft priors cannot turn an ambiguous evidence set into a recommendation. The
 status and reason are typed as `InferenceDecisionStatus` and `InferenceDecisionReason`.
+This evidence gate is separate from the heuristic `confidence` and `confidence_label`:
+the label can remain `indeterminate` even when `report.decision` recommends a sole
+contender. Neither is a calibrated probability; inspect them alongside evidence
+diagnostics and warnings.
 The existing `operational_class_id` remains a deterministic best candidate for ranking
 and diagnostics, not a guarantee that the convention is established.
 

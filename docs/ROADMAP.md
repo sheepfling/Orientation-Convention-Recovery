@@ -11,9 +11,10 @@ implementation consistency, not recovery accuracy on outside data.
   local Windows/Python 3.14. The Python 3.11/3.12 Linux/Windows matrix remains a
   separate release gate.
 - The analytic synthetic corpus has labeled recovery/ambiguity/miss evaluation,
-  including paired seeded noise and motion-profile sweeps with condition-wise
-  recovery/diagnostic rates; it is not evidence of recovery accuracy on independent
-  systems.
+  including paired seeded noise, motion-profile, duration, timestamp-jitter,
+  whole-row-dropout, and channel-latency sweeps with condition-wise outcomes. These
+  controlled studies are not evidence of accuracy on independent systems; no
+  independently labeled external logs are available yet.
 - Exact-class grouping and evidence prefixes avoid known quadratic paths.
 - Exact symmetry grouping, ranking, operational selection, evidence summaries,
   dimension assessments, diagnostics, and report assembly now have separate

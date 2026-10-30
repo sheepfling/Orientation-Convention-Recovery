@@ -137,50 +137,79 @@ not interpret the 30/30 outcome as a statistical guarantee.
 
 ## Acquisition-impairment snapshot
 
-Commit `6400de0` was evaluated on one rich-three-axis motion profile at low
-measurement noise, with five paired seeds at 4-second and 10-second durations. The
-factorial sweep varied timestamp jitter (0 or ±5 ms), per-sample dropout probability
-(0 or 0.35), orientation delay (0 or 50 ms), and rate delay (0 or 50 ms): 32
-conditions per seed, or 160 noisy cases plus the three control cases. The table groups
-trials by duration and the number of nonzero acquisition factors; it does not imply
-that factors have equal physical severity. The run used Python 3.14.6, NumPy 2.5.2,
-SciPy 1.18.0, and package version `0.0.1a0.post1.dev20+g6400de09c`.
+Commit `6400de0` was evaluated on rich-three-axis trajectories at 4 seconds
+(161 scheduled samples, 25 ms spacing), using 30 paired noise seeds. The first
+acquisition sweep crossed timestamp jitter (0 or ±5 ms), whole-row dropout
+probability (0 or 0.35), orientation delay (0 or 50 ms), and rate delay (0 or 50 ms):
+16 conditions per seed, or 480 noisy cases plus three controls. The table combines
+the two jitter levels; each row therefore contains 60 cases. The run used Python
+3.14.6, NumPy 2.5.2, SciPy 1.18.0, and package version
+`0.0.1a0.post1.dev20+g6400de09c`.
 
-| Duration | Nonzero factors (of 4) | Trials | Correct recommendations | Abstentions | Wrong recommendations |
-|---|---:|---:|---:|---:|---:|
-| 4 seconds | 0 | 5 | 0 | 5 | 0 |
-| 4 seconds | 1 | 20 | 3 | 17 | 0 |
-| 4 seconds | 2 | 30 | 3 | 27 | 0 |
-| 4 seconds | 3 | 20 | 1 | 19 | 0 |
-| 4 seconds | 4 | 5 | 1 | 4 | 0 |
-| 10 seconds | 0 | 5 | 5 | 0 | 0 |
-| 10 seconds | 1 | 20 | 20 | 0 | 0 |
-| 10 seconds | 2 | 30 | 30 | 0 | 0 |
-| 10 seconds | 3 | 20 | 20 | 0 | 0 |
-| 10 seconds | 4 | 5 | 5 | 0 | 0 |
+| Dropout p | Orient delay | Rate delay | Trials | Recommended | Abstain | Wrong |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0 ms | 0 ms | 60 | 0 | 60 | 0 |
+| 0 | 0 ms | 50 ms | 60 | 0 | 60 | 0 |
+| 0 | 50 ms | 0 ms | 60 | 0 | 60 | 0 |
+| 0 | 50 ms | 50 ms | 60 | 0 | 60 | 0 |
+| 0.35 | 0 ms | 0 ms | 60 | 26 | 34 | 0 |
+| 0.35 | 0 ms | 50 ms | 60 | 0 | 60 | 0 |
+| 0.35 | 50 ms | 0 ms | 60 | 2 | 58 | 0 |
+| 0.35 | 50 ms | 50 ms | 60 | 20 | 40 | 0 |
 
-All 88 recommendations among the 160 noisy trials were correct; there were no
-evidence misses or operational-class misses in this run. The 4-second results are
-non-monotonic: the unperturbed baseline abstained on all five trials, while some
-dropout conditions produced recommendations. Do not infer that dropout improves
-recovery; this needs investigation with more seeds and motion/noise profiles. At
-10 seconds all 80 trials were recommended correctly, including the combined maximum
-settings. This is a small, controlled synthetic diagnostic—not evidence of logger
-robustness, real-world accuracy, or confidence calibration.
+Across the 480 noisy trials, 48 recommendations were correct and 432 cases abstained;
+there were no evidence misses or operational-class misses. All noisy cases met the
+current evidence-sufficiency test, but every case's separate heuristic confidence
+label remained `indeterminate`. In 240 paired comparisons of no dropout versus 35%
+dropout, 48 contender sets changed from two classes to one, always retaining truth;
+the other 192 remained two-class sets. The ±5 ms jitter changed no contender set or
+decision in the 240 paired jitter comparisons. At 35% requested dropout, the generator
+retained an average of 105.8 of 161 samples because duration endpoints are protected.
 
-The run can be regenerated with:
+A plausible generator-specific explanation is that longer gaps let the integrated
+orientation change stand out from independent per-sample measurement noise. That is
+not evidence that real dropout improves inference: this is one analytic motion and
+white-noise model, and the inference diagnostics warn that adjacent residuals are
+correlated while the evidence calculation uses an approximate i.i.d. likelihood.
+More importantly, the apparent benefit disappears at higher noise:
+
+| Noise profile | Dropout probability | Trials | Recommendations | Abstentions |
+|---|---:|---:|---:|---:|
+| Low | 0 | 60 | 0 | 60 |
+| Low | 0.35 | 60 | 26 | 34 |
+| Moderate | 0 | 60 | 0 | 60 |
+| Moderate | 0.35 | 60 | 0 | 60 |
+| High | 0 | 60 | 0 | 60 |
+| High | 0.35 | 60 | 0 | 60 |
+
+This companion 4-second run crossed all three noise profiles with the same two jitter
+and dropout levels over 30 seeds (360 noisy cases plus controls). The 26 recommendations
+were all correct and occurred only at low noise with 35% dropout. All moderate- and
+high-noise cases abstained; the 29 evidence-insufficient cases were all high-noise.
+These paired synthetic results help expose sensitivity, but do not establish
+real-world accuracy, logger robustness, or confidence calibration.
+
+The 30-seed acquisition and noise sweeps can be regenerated with:
 
 ```bash
 python scripts/generate_validation_corpus.py \
-  --outdir .validation-acquisition-stress-20261030 \
-  --noise-profile low --motion-profile rich-three-axis --noise-replicates 5 \
-  --noise-sample-counts 161 401 \
+  --outdir .validation-corpus-short-duration-30seed \
+  --noise-profile low --motion-profile rich-three-axis --noise-replicates 30 \
+  --noise-sample-counts 161 \
   --timestamp-jitter-amplitudes-s 0 0.005 \
   --dropout-probabilities 0 0.35 \
   --orientation-latencies-s 0 0.05 --rate-latencies-s 0 0.05
 python scripts/validate_corpus.py \
-  .validation-acquisition-stress-20261030/manifest.json \
-  --output .validation-acquisition-stress-20261030/assessment.json
+  .validation-corpus-short-duration-30seed/manifest.json \
+  --output .validation-corpus-short-duration-30seed/assessment.json
+python scripts/generate_validation_corpus.py \
+  --outdir .validation-corpus-short-duration-noise-30seed \
+  --noise-profile all --motion-profile rich-three-axis --noise-replicates 30 \
+  --noise-sample-counts 161 --timestamp-jitter-amplitudes-s 0 0.005 \
+  --dropout-probabilities 0 0.35
+python scripts/validate_corpus.py \
+  .validation-corpus-short-duration-noise-30seed/manifest.json \
+  --output .validation-corpus-short-duration-noise-30seed/assessment.json
 ```
 
 ```bash
@@ -189,8 +218,9 @@ python scripts/validate_corpus.py .validation-corpus/manifest.json \
   --output .validation-corpus/assessment.json
 ```
 
-The generated directory is ignored by Git. Choose a new directory with `--outdir`
-when you need another copy; the generator refuses to overwrite an existing one.
+The default `.validation-corpus/` and `.validation-corpus-*` directories are ignored
+by Git. Keep generated outputs under that prefix, choose a new name with `--outdir`
+for each run, and the generator refuses to overwrite an existing directory.
 
 Each manifest case records the CSV path, a source for its label, the complete known
 convention, and the search configuration. Paths are relative to the manifest. The
