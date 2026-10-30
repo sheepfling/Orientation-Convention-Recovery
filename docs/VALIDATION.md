@@ -75,6 +75,30 @@ It demonstrates that an operational class can be wrong even while truth remains 
 plausible contender; consumers should inspect evidence sufficiency, confidence, and
 the contender set rather than treating the operational class as confirmed.
 
+## Duration-aware decision snapshot
+
+The evidence-gated decision was evaluated on commit `c54c51d` with 30 paired seeds,
+four motion profiles, three noise levels, and 4-second/10-second recordings: 720 noisy
+cases plus the three original control cases. In the rich-three-axis, low-noise
+condition, the decision abstained on all 30 four-second trials and recommended the
+correct class on all 30 ten-second trials:
+
+| Duration | Recommendations | Correct recommendations | Abstentions |
+|---|---:|---:|---:|
+| 4 seconds | 0 / 30 | — | 30 / 30 |
+| 10 seconds | 30 / 30 | 30 / 30 | 0 / 30 |
+
+Across all 720 noisy cases, 30 were recommended and 690 abstained; none of the 30
+recommendations was wrong (4.17% noisy-case coverage, 100% accuracy among those
+recommendations). The three control cases were also recommended correctly. All other
+noisy motion/noise/duration combinations abstained. This demonstrates useful sensitivity
+to recording duration for one informative synthetic condition, but the overall coverage
+is intentionally low and does not establish real-world precision or calibration.
+
+The run used Python 3.14.6, NumPy 2.5.2, SciPy 1.18.0, and package version
+`0.0.1a0.post1.dev18+gc54c51d8d`. The counts are synthetic diagnostic results only; do
+not interpret the 30/30 outcome as a statistical guarantee.
+
 ```bash
 python scripts/generate_validation_corpus.py
 python scripts/validate_corpus.py .validation-corpus/manifest.json \
