@@ -29,6 +29,39 @@ recordings at 25 ms spacing. Independent seeded streams for orientation and rate
 noise keep each shorter trial an exact prefix of its longer paired trial, and the
 assessment groups results by sample count and period.
 
+Acquisition stress factors can be varied independently with
+`--timestamp-jitter-amplitudes-s`, `--dropout-probabilities`,
+`--orientation-latencies-s`, and `--rate-latencies-s`. Supplying several values to a
+flag creates a factorial sweep, so case counts multiply across the selected motion,
+noise, duration, and acquisition conditions. Timestamp jitter is uniform in the
+requested symmetric amplitude and must be less than half the 25 ms sample period.
+Dropout is seeded per-sample and the manifest records both its requested probability
+and realized count; scheduled duration endpoints are retained to preserve paired
+duration comparisons. A positive channel latency means that channel's value at row
+time `t` was generated from the analytic signal at `t - latency`. Thus a mismatch
+between orientation and rate latency is an intentional synchronization error, not
+an inferred convention. The assessment groups by requested acquisition condition,
+not each seed's realized dropout count, and reports observed/dropped sample-count
+ranges and means for those replicates.
+
+For example, this compares baseline and perturbed acquisition conditions with paired
+seeds at two durations:
+
+```bash
+python scripts/generate_validation_corpus.py \
+  --noise-profile low --noise-replicates 30 --noise-sample-counts 161 401 \
+  --timestamp-jitter-amplitudes-s 0 0.002 \
+  --dropout-probabilities 0 0.1 \
+  --orientation-latencies-s 0 0.01 --rate-latencies-s 0 0.025
+```
+
+This produces 32 conditions per seed (two durations × two jitter levels × two
+dropout levels × two orientation delays × two rate delays), or 960 noisy cases for
+30 seeds. Start with fewer factors or replicates when exploring because the sweep
+grows multiplicatively. These remain controlled synthetic stress tests: they can
+expose sensitivity and implementation defects, but they do not model every logger
+or substitute for independently labeled real trajectories.
+
 ```bash
 python scripts/generate_validation_corpus.py \
   --noise-profile all --motion-profile all --noise-replicates 30 \

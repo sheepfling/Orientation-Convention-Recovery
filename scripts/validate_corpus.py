@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import platform
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Self, cast
 
@@ -30,17 +31,40 @@ class MeasurementConditions(BaseModel):
 
     motion_profile_id: str | None = Field(default=None, min_length=1)
     timestamp_jitter_amplitude_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
-    dropped_sample_count: int = Field(default=0, ge=0)
+    dropout_probability: float | None = Field(default=None, ge=0.0, lt=1.0, allow_inf_nan=False)
+    dropped_sample_count: int | None = Field(default=0, ge=0)
+    orientation_latency_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
+    rate_latency_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     orientation_noise_sigma_rad: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     rate_noise_sigma_rad_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     noise_seed: int | None = Field(default=None, ge=0)
     sample_count: int | None = Field(default=None, gt=0)
+    observed_sample_count: int | None = Field(default=None, gt=0)
     sample_period_s: float | None = Field(default=None, gt=0.0, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def _validate_sampling_pair(self) -> Self:
         if (self.sample_count is None) != (self.sample_period_s is None):
             raise ValueError("sample_count and sample_period_s must be provided together")
+        ####
+        if self.observed_sample_count is not None:
+            if self.sample_count is None:
+                raise ValueError("observed_sample_count requires sample_count and sample_period_s")
+            ####
+            if self.dropped_sample_count is None:
+                raise ValueError("dropped_sample_count is required with observed_sample_count")
+            ####
+            if self.observed_sample_count + self.dropped_sample_count != self.sample_count:
+                raise ValueError(
+                    "observed_sample_count plus dropped_sample_count must equal sample_count"
+                )
+            ####
+        ####
+        if (
+            self.sample_period_s is not None
+            and self.timestamp_jitter_amplitude_s >= self.sample_period_s / 2.0
+        ):
+            raise ValueError("timestamp jitter amplitude must be less than half the sample period")
         ####
         return self
     ####
@@ -180,6 +204,12 @@ class ConditionSummary(BaseModel):
     representation: AttitudeRepresentation
     measurement_conditions: MeasurementConditions
     case_count: int = Field(gt=0)
+    observed_sample_count_min: int
+    observed_sample_count_max: int
+    observed_sample_count_mean: float
+    dropped_sample_count_min: int
+    dropped_sample_count_max: int
+    dropped_sample_count_mean: float
     resolved_correct: int
     ambiguous_contains_truth: int
     evidence_miss: int
@@ -274,56 +304,97 @@ class CorpusAssessment(BaseModel):
 ####
 
 
-def _condition_summaries(assessments: list[CaseAssessment]) -> tuple[ConditionSummary, ...]:
-    groups: dict[
-        tuple[
-            AttitudeRepresentation,
-            str | None,
-            float,
-            int,
-            float,
-            float,
-            int | None,
-            float | None,
-        ],
-        list[CaseAssessment],
-    ] = {}
-    for assessment in assessments:
-        conditions = assessment.measurement_conditions
-        key = (
-            assessment.representation,
-            conditions.motion_profile_id,
-            conditions.timestamp_jitter_amplitude_s,
-            conditions.dropped_sample_count,
-            conditions.orientation_noise_sigma_rad,
-            conditions.rate_noise_sigma_rad_s,
-            conditions.sample_count,
-            conditions.sample_period_s,
+@dataclass(frozen=True, slots=True)
+class _ConditionGroupKey:
+    """Named dimensions that define one comparable acquisition condition."""
+
+    representation: AttitudeRepresentation
+    motion_profile_id: str | None
+    timestamp_jitter_amplitude_s: float
+    dropout_probability: float | None
+    orientation_latency_s: float
+    rate_latency_s: float
+    orientation_noise_sigma_rad: float
+    rate_noise_sigma_rad_s: float
+    sample_count: int | None
+    sample_period_s: float | None
+
+    def ordering_key(self) -> tuple[str, str, float, float, float, float, float, float, int, float]:
+        """Return a stable total ordering for serialized summaries."""
+
+        return (
+            self.representation.value,
+            self.motion_profile_id or "",
+            self.timestamp_jitter_amplitude_s,
+            self.dropout_probability if self.dropout_probability is not None else -1.0,
+            self.orientation_latency_s,
+            self.rate_latency_s,
+            self.orientation_noise_sigma_rad,
+            self.rate_noise_sigma_rad_s,
+            self.sample_count if self.sample_count is not None else -1,
+            self.sample_period_s if self.sample_period_s is not None else -1.0,
         )
+    ####
+####
+
+
+def _condition_group_key(assessment: CaseAssessment) -> _ConditionGroupKey:
+    conditions = assessment.measurement_conditions
+    return _ConditionGroupKey(
+        representation=assessment.representation,
+        motion_profile_id=conditions.motion_profile_id,
+        timestamp_jitter_amplitude_s=conditions.timestamp_jitter_amplitude_s,
+        dropout_probability=conditions.dropout_probability,
+        orientation_latency_s=conditions.orientation_latency_s,
+        rate_latency_s=conditions.rate_latency_s,
+        orientation_noise_sigma_rad=conditions.orientation_noise_sigma_rad,
+        rate_noise_sigma_rad_s=conditions.rate_noise_sigma_rad_s,
+        sample_count=conditions.sample_count,
+        sample_period_s=conditions.sample_period_s,
+    )
+####
+
+
+def _condition_summaries(assessments: list[CaseAssessment]) -> tuple[ConditionSummary, ...]:
+    groups: dict[_ConditionGroupKey, list[CaseAssessment]] = {}
+    for assessment in assessments:
+        key = _condition_group_key(assessment)
         groups.setdefault(key, []).append(assessment)
     ####
     summaries: list[ConditionSummary] = []
     for key, cases in sorted(
         groups.items(),
-        key=lambda item: (
-            item[0][0].value,
-            item[0][1] or "",
-            item[0][2],
-            item[0][3],
-            item[0][4],
-            item[0][5],
-            item[0][6] or 0,
-            item[0][7] or 0.0,
-        ),
+        key=lambda item: item[0].ordering_key(),
     ):
         representative = cases[0]
+        dropped_counts = [item.measurement_conditions.dropped_sample_count or 0 for item in cases]
+        observed_counts = [item.sample_count for item in cases]
         summaries.append(
             ConditionSummary(
-                representation=key[0],
+                representation=key.representation,
                 measurement_conditions=representative.measurement_conditions.model_copy(
-                    update={"noise_seed": None}
+                    update={
+                        "noise_seed": None,
+                        "dropped_sample_count": (
+                            dropped_counts[0]
+                            if min(dropped_counts) == max(dropped_counts)
+                            else None
+                        ),
+                        "observed_sample_count": (
+                            observed_counts[0]
+                            if representative.measurement_conditions.sample_count is not None
+                            and min(observed_counts) == max(observed_counts)
+                            else None
+                        ),
+                    }
                 ),
                 case_count=len(cases),
+                observed_sample_count_min=min(observed_counts),
+                observed_sample_count_max=max(observed_counts),
+                observed_sample_count_mean=sum(observed_counts) / len(observed_counts),
+                dropped_sample_count_min=min(dropped_counts),
+                dropped_sample_count_max=max(dropped_counts),
+                dropped_sample_count_mean=sum(dropped_counts) / len(dropped_counts),
                 resolved_correct=sum(item.outcome == "resolved_correct" for item in cases),
                 ambiguous_contains_truth=sum(
                     item.outcome == "ambiguous_contains_truth" for item in cases
@@ -370,6 +441,14 @@ def validate_corpus(manifest_path: Path) -> CorpusAssessment:
             time_column=case.time_column,
             config=case.config,
         )
+        if (
+            case.measurement_conditions.observed_sample_count is not None
+            and case.measurement_conditions.observed_sample_count != report.sample_count
+        ):
+            raise ValueError(
+                f"{case.case_id}: observed_sample_count in the manifest does not match the CSV"
+            )
+        ####
         if (case.representation is AttitudeRepresentation.QUATERNION) != (
             case.truth.quaternion_order is not None
         ):

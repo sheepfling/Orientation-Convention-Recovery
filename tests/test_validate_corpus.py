@@ -92,17 +92,51 @@ def test_validation_corpus_rejects_duplicate_case_ids(tmp_path: Path) -> None:
 ####
 
 
+def test_validation_corpus_checks_declared_observation_count(tmp_path: Path) -> None:
+    manifest = generate_corpus(
+        tmp_path / "incorrect-observation-count-corpus",
+        noise_sample_counts=(41,),
+        dropout_probabilities=(0.1,),
+    )
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    noisy_case = next(
+        case for case in payload["cases"] if "noise_seed" in case["measurement_conditions"]
+    )
+    noisy_case["measurement_conditions"]["observed_sample_count"] += 1
+    noisy_case["measurement_conditions"]["dropped_sample_count"] -= 1
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"observed_sample_count.*does not match the CSV"):
+        validate_corpus(manifest)
+    ####
+####
+
+
 @pytest.mark.parametrize(
     "values",
     (
         {"timestamp_jitter_amplitude_s": -0.001},
+        {"dropout_probability": 1.0},
         {"dropped_sample_count": -1},
+        {"orientation_latency_s": -0.001},
+        {"rate_latency_s": float("inf")},
         {"orientation_noise_sigma_rad": float("nan")},
         {"rate_noise_sigma_rad_s": float("inf")},
         {"noise_seed": -1},
         {"sample_count": 161},
         {"sample_period_s": 0.025},
         {"sample_count": 0, "sample_period_s": 0.025},
+        {
+            "sample_count": 161,
+            "observed_sample_count": 140,
+            "dropped_sample_count": 20,
+            "sample_period_s": 0.025,
+        },
+        {
+            "timestamp_jitter_amplitude_s": 0.013,
+            "sample_count": 161,
+            "sample_period_s": 0.025,
+        },
         {"unrecognized_condition": True},
     ),
 )

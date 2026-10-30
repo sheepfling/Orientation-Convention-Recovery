@@ -7,10 +7,11 @@ import csv
 import json
 from dataclasses import dataclass
 from enum import StrEnum
+from math import isfinite
 from pathlib import Path
 from typing import Literal
 
-from numpy import arange, array, cos, cross, cumsum, float64, pi, sin, sqrt, stack, zeros
+from numpy import arange, array, bool_, cos, cross, cumsum, float64, pi, sin, sqrt, stack, zeros
 from numpy.random import Generator, SeedSequence, default_rng
 from numpy.typing import NDArray
 
@@ -155,15 +156,29 @@ def _noisy_quaternions(
 ####
 
 
-def _write_csv(
-    path: Path, motion: AnalyticMotion, orientation: FloatArray, rates: FloatArray
-) -> None:
+def _retained_sample_mask(
+    sample_count: int,
+    dropout_probability: float,
+    dropout_seed: SeedSequence,
+    sample_counts: tuple[int, ...],
+) -> NDArray[bool_]:
+    """Draw paired Bernoulli dropouts while retaining configured duration endpoints."""
+
+    retained = default_rng(dropout_seed).random(sample_count) >= dropout_probability
+    protected_endpoints = {0}
+    protected_endpoints.update(count - 1 for count in sample_counts if count <= sample_count)
+    retained[list(protected_endpoints)] = True
+    return retained
+####
+
+
+def _write_csv(path: Path, time_s: FloatArray, orientation: FloatArray, rates: FloatArray) -> None:
     orientation_names = tuple(f"a{index}" for index in range(orientation.shape[1]))
     with path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(("time_s", *orientation_names, "r0", "r1", "r2"))
-        for time_s, attitude, rate in zip(motion.time_s, orientation, rates, strict=True):
-            writer.writerow((time_s, *attitude, *rate))
+        for timestamp, attitude, rate in zip(time_s, orientation, rates, strict=True):
+            writer.writerow((timestamp, *attitude, *rate))
         ####
     ####
 ####
@@ -176,8 +191,12 @@ def generate_corpus(
     noise_replicates: int = 1,
     noise_sample_counts: tuple[int, ...] = (161,),
     motion_profiles: tuple[MotionProfile, ...] = (MotionProfile.RICH_THREE_AXIS,),
+    timestamp_jitter_amplitudes_s: tuple[float, ...] = (0.0,),
+    dropout_probabilities: tuple[float, ...] = (0.0,),
+    orientation_latencies_s: tuple[float, ...] = (0.0,),
+    rate_latencies_s: tuple[float, ...] = (0.0,),
 ) -> Path:
-    """Write analytic convention cases across optional noise and motion profiles."""
+    """Write labeled synthetic cases across seeded acquisition conditions."""
 
     if not noise_profiles:
         raise ValueError("At least one noise profile is required.")
@@ -194,6 +213,46 @@ def generate_corpus(
     if len(noise_sample_counts) != len(set(noise_sample_counts)):
         raise ValueError("noise_sample_counts must be unique.")
     ####
+    factor_values = {
+        "timestamp_jitter_amplitudes_s": timestamp_jitter_amplitudes_s,
+        "dropout_probabilities": dropout_probabilities,
+        "orientation_latencies_s": orientation_latencies_s,
+        "rate_latencies_s": rate_latencies_s,
+    }
+    for name, values in factor_values.items():
+        if not values or any(not isfinite(value) or value < 0.0 for value in values):
+            raise ValueError(f"{name} must contain finite non-negative values.")
+        ####
+        if len(values) != len(set(values)):
+            raise ValueError(f"{name} must be unique.")
+        ####
+    ####
+    if any(probability >= 1.0 for probability in dropout_probabilities):
+        raise ValueError("dropout_probabilities must be less than 1.")
+    ####
+    if any(amplitude >= NOISE_SAMPLE_PERIOD_S / 2.0 for amplitude in timestamp_jitter_amplitudes_s):
+        raise ValueError("timestamp jitter amplitudes must be less than half the sample period.")
+    ####
+    for sample_count in noise_sample_counts:
+        for dropout_probability in dropout_probabilities:
+            for replicate_index in range(noise_replicates):
+                noise_seed = 20261030 + replicate_index
+                dropout_seed = SeedSequence(noise_seed).spawn(4)[3]
+                retained = _retained_sample_mask(
+                    sample_count,
+                    dropout_probability,
+                    dropout_seed,
+                    noise_sample_counts,
+                )
+                if int(retained.sum()) < 21:
+                    raise ValueError(
+                        "A seeded dropout realization left fewer than 21 samples for "
+                        f"n={sample_count}, p={dropout_probability}, seed={noise_seed}."
+                    )
+                ####
+            ####
+        ####
+    ####
     outdir.mkdir(parents=True, exist_ok=False)
     regular = analytic_motion(arange(101, dtype=float64) * 0.025)
     jitter = 0.025 + 0.003 * sin(arange(120, dtype=float64) * 0.7)
@@ -203,7 +262,7 @@ def generate_corpus(
     euler = analytic_motion(arange(91, dtype=float64) * 0.03)
     _write_csv(
         outdir / "quaternion_body.csv",
-        regular,
+        regular.time_s,
         regular.quaternion_xyzw,
         regular.body_rates_rad_s,
     )
@@ -213,13 +272,13 @@ def generate_corpus(
     world_rqp = jittered.world_rates_rad_s[:, (2, 1, 0)]
     _write_csv(
         outdir / "quaternion_world_jittered.csv",
-        jittered,
+        jittered.time_s,
         inverted[:, (3, 0, 1, 2)],
         world_rqp,
     )
     _write_csv(
         outdir / "euler_degrees.csv",
-        euler,
+        euler.time_s,
         euler.euler_xyz_rad * (180.0 / pi),
         euler.body_rates_rad_s * (180.0 / pi),
     )
@@ -229,58 +288,125 @@ def generate_corpus(
         for sample_count in noise_sample_counts:
             noise_times = arange(sample_count, dtype=float64) * NOISE_SAMPLE_PERIOD_S
             for profile in noise_profiles:
-                for replicate_index in range(noise_replicates):
-                    noise_seed = 20261030 + replicate_index
-                    orientation_seed, rate_seed = SeedSequence(noise_seed).spawn(2)
-                    orientation_random = default_rng(orientation_seed)
-                    rate_random = default_rng(rate_seed)
-                    noisy = analytic_motion(noise_times, motion_profile)
-                    noisy_quaternions = _noisy_quaternions(
-                        noisy.quaternion_xyzw,
-                        sigma_rad=profile.orientation_sigma_rad,
-                        random=orientation_random,
-                    )
-                    noisy_rates = noisy.body_rates_rad_s + rate_random.normal(
-                        0.0, profile.rate_sigma_rad_s, noisy.body_rates_rad_s.shape
-                    )
-                    case_id = (
-                        f"analytic-noisy-{motion_profile.value}-{profile.name}-"
-                        f"n{sample_count}-{replicate_index + 1:03d}"
-                    )
-                    csv_name = (
-                        f"quaternion_noisy_{motion_profile.value}_{profile.name}_"
-                        f"n{sample_count}_{replicate_index + 1:03d}.csv"
-                    )
-                    _write_csv(outdir / csv_name, noisy, noisy_quaternions, noisy_rates)
-                    noisy_cases.append(
-                        {
-                            "case_id": case_id,
-                            "csv": csv_name,
-                            "label_source": (
-                                "analytic ZYX generator with seeded measurement noise: "
-                                "scripts/generate_validation_corpus.py"
-                            ),
-                            "measurement_conditions": {
-                                "motion_profile_id": motion_profile.value,
-                                "orientation_noise_sigma_rad": profile.orientation_sigma_rad,
-                                "rate_noise_sigma_rad_s": profile.rate_sigma_rad_s,
-                                "noise_seed": noise_seed,
-                                "sample_count": sample_count,
-                                "sample_period_s": NOISE_SAMPLE_PERIOD_S,
-                            },
-                            "representation": "quaternion",
-                            "orientation_columns": ["a0", "a1", "a2", "a3"],
-                            "rate_columns": ["r0", "r1", "r2"],
-                            "time_column": "time_s",
-                            "truth": {
-                                "attitude_direction": "body_to_world",
-                                "quaternion_order": "scalar_last",
-                                "rate_frame": "body",
-                                "rate_order": "pqr",
-                                "rate_unit": "radians_per_second",
-                            },
-                        }
-                    )
+                for jitter_index, jitter_amplitude_s in enumerate(timestamp_jitter_amplitudes_s):
+                    for dropout_index, dropout_probability in enumerate(dropout_probabilities):
+                        for orientation_latency_index, orientation_latency_s in enumerate(
+                            orientation_latencies_s
+                        ):
+                            for rate_latency_index, rate_latency_s in enumerate(rate_latencies_s):
+                                for replicate_index in range(noise_replicates):
+                                    noise_seed = 20261030 + replicate_index
+                                    (
+                                        orientation_seed,
+                                        rate_seed,
+                                        jitter_seed,
+                                        dropout_seed,
+                                    ) = SeedSequence(noise_seed).spawn(4)
+                                    orientation_random = default_rng(orientation_seed)
+                                    rate_random = default_rng(rate_seed)
+                                    jitter_random = default_rng(jitter_seed)
+                                    timestamp_jitter = jitter_random.uniform(
+                                        -jitter_amplitude_s, jitter_amplitude_s, sample_count
+                                    ).astype(float64)
+                                    timestamp_jitter[0] = 0.0
+                                    observed_times = noise_times + timestamp_jitter
+                                    orientation_motion = analytic_motion(
+                                        observed_times - orientation_latency_s, motion_profile
+                                    )
+                                    rate_motion = analytic_motion(
+                                        observed_times - rate_latency_s, motion_profile
+                                    )
+                                    noisy_quaternions = _noisy_quaternions(
+                                        orientation_motion.quaternion_xyzw,
+                                        sigma_rad=profile.orientation_sigma_rad,
+                                        random=orientation_random,
+                                    )
+                                    noisy_rates = rate_motion.body_rates_rad_s + rate_random.normal(
+                                        0.0,
+                                        profile.rate_sigma_rad_s,
+                                        rate_motion.body_rates_rad_s.shape,
+                                    )
+                                    retained = _retained_sample_mask(
+                                        sample_count,
+                                        dropout_probability,
+                                        dropout_seed,
+                                        noise_sample_counts,
+                                    )
+                                    if int(retained.sum()) < 21:
+                                        raise ValueError(
+                                            "Dropout realization left fewer than 21 samples for "
+                                            f"{motion_profile.value}, {profile.name}, "
+                                            f"n={sample_count}, p={dropout_probability}, "
+                                            f"seed={noise_seed}."
+                                        )
+                                    ####
+                                    actual_dropped_count = int((~retained).sum())
+                                    jitter_token = f"j{jitter_index:02d}"
+                                    dropout_token = f"d{dropout_index:02d}"
+                                    orientation_latency_token = f"ol{orientation_latency_index:02d}"
+                                    rate_latency_token = f"rl{rate_latency_index:02d}"
+                                    condition_token = (
+                                        f"{jitter_token}-{dropout_token}-"
+                                        f"{orientation_latency_token}-{rate_latency_token}"
+                                    )
+                                    case_id = (
+                                        f"analytic-noisy-{motion_profile.value}-{profile.name}-"
+                                        f"{condition_token}-n{sample_count}-"
+                                        f"{replicate_index + 1:03d}"
+                                    )
+                                    csv_name = (
+                                        f"quaternion_noisy_{motion_profile.value}_{profile.name}_"
+                                        f"{condition_token}_n{sample_count}_"
+                                        f"{replicate_index + 1:03d}.csv"
+                                    )
+                                    _write_csv(
+                                        outdir / csv_name,
+                                        observed_times[retained],
+                                        noisy_quaternions[retained],
+                                        noisy_rates[retained],
+                                    )
+                                    noisy_cases.append(
+                                        {
+                                            "case_id": case_id,
+                                            "csv": csv_name,
+                                            "label_source": (
+                                                "analytic ZYX generator with seeded acquisition "
+                                                "perturbations: "
+                                                "scripts/generate_validation_corpus.py"
+                                            ),
+                                            "measurement_conditions": {
+                                                "motion_profile_id": motion_profile.value,
+                                                "timestamp_jitter_amplitude_s": jitter_amplitude_s,
+                                                "dropout_probability": dropout_probability,
+                                                "dropped_sample_count": actual_dropped_count,
+                                                "orientation_latency_s": orientation_latency_s,
+                                                "rate_latency_s": rate_latency_s,
+                                                "orientation_noise_sigma_rad": (
+                                                    profile.orientation_sigma_rad
+                                                ),
+                                                "rate_noise_sigma_rad_s": profile.rate_sigma_rad_s,
+                                                "noise_seed": noise_seed,
+                                                "sample_count": sample_count,
+                                                "observed_sample_count": int(retained.sum()),
+                                                "sample_period_s": NOISE_SAMPLE_PERIOD_S,
+                                            },
+                                            "representation": "quaternion",
+                                            "orientation_columns": ["a0", "a1", "a2", "a3"],
+                                            "rate_columns": ["r0", "r1", "r2"],
+                                            "time_column": "time_s",
+                                            "truth": {
+                                                "attitude_direction": "body_to_world",
+                                                "quaternion_order": "scalar_last",
+                                                "rate_frame": "body",
+                                                "rate_order": "pqr",
+                                                "rate_unit": "radians_per_second",
+                                            },
+                                        }
+                                    )
+                                ####
+                            ####
+                        ####
+                    ####
                 ####
             ####
         ####
@@ -399,6 +525,38 @@ def main() -> None:
         default=MotionProfile.RICH_THREE_AXIS.value,
         help="analytic motion family to include in noisy cases",
     )
+    parser.add_argument(
+        "--timestamp-jitter-amplitudes-s",
+        type=float,
+        nargs="+",
+        default=(0.0,),
+        metavar="SECONDS",
+        help="maximum absolute timestamp jitter; each value is a separate condition",
+    )
+    parser.add_argument(
+        "--dropout-probabilities",
+        type=float,
+        nargs="+",
+        default=(0.0,),
+        metavar="PROBABILITY",
+        help="independent per-sample dropout probabilities in [0, 1)",
+    )
+    parser.add_argument(
+        "--orientation-latencies-s",
+        type=float,
+        nargs="+",
+        default=(0.0,),
+        metavar="SECONDS",
+        help="orientation channel delays relative to the row timestamp",
+    )
+    parser.add_argument(
+        "--rate-latencies-s",
+        type=float,
+        nargs="+",
+        default=(0.0,),
+        metavar="SECONDS",
+        help="angular-rate channel delays relative to the row timestamp",
+    )
     args = parser.parse_args()
     profiles = (
         NOISE_PROFILES
@@ -417,6 +575,10 @@ def main() -> None:
             noise_replicates=args.noise_replicates,
             noise_sample_counts=tuple(args.noise_sample_counts),
             motion_profiles=motion_profiles,
+            timestamp_jitter_amplitudes_s=tuple(args.timestamp_jitter_amplitudes_s),
+            dropout_probabilities=tuple(args.dropout_probabilities),
+            orientation_latencies_s=tuple(args.orientation_latencies_s),
+            rate_latencies_s=tuple(args.rate_latencies_s),
         )
     )
 ####
