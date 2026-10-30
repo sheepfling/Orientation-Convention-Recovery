@@ -285,6 +285,48 @@ sensor-noise-correlation estimate; it also reinforces that the evidence model's
 independence assumption needs a more suitable residual covariance model before
 its likelihood ratio can be treated as calibrated.
 
+### 200-seed low-noise follow-up
+
+To reduce Monte Carlo uncertainty in the only noise profile that produced
+recommendations in the preceding 30-seed sweep, 200 paired seeds were run for
+each of the same four correlation conditions at 4 seconds (800 noisy cases plus
+three controls). Truth remained in
+every evidence contender set; there were no evidence misses, operational
+misses, or insufficient-evidence cases. The table reports recommendations out
+of 200, the mean fixed-noise log-likelihood ratio, and the mean interval-residual
+lag-1 estimate:
+
+| Requested `(rho_orientation, rho_rate)` | Recommendations | Mean log LR | Mean interval-residual lag-1 |
+|---|---:|---:|---:|
+| `(0, 0)` | 0 / 200 | 88.93 | -0.466 |
+| `(0, 0.8)` | 0 / 200 | 88.35 | -0.452 |
+| `(0.8, 0)` | 196 / 200 | 425.50 | -0.066 |
+| `(0.8, 0.8)` | 89 / 200 | 411.47 | -0.018 |
+
+All 285 recommendations were correct, and the remaining 515 noisy cases
+abstained. With zero observed errors, the one-sided 95% exact-binomial upper
+bounds on the conditional error rate are 1.52% for the 196 recommendations and
+3.31% for the 89 recommendations. These bounds apply only to these
+generator-defined conditions; they are not a real-world precision guarantee.
+The large shift in log LR and recommendation coverage under correlated
+orientation noise is now reproducible at 200 seeds, so dependence-aware evidence
+is a substantive next correctness task—not a threshold-tuning exercise.
+The assessment is saved locally at
+`.validation-corpus-ar1-low-200seed/assessment.json` (Git-ignored) and can be
+regenerated with:
+
+```bash
+python scripts/generate_validation_corpus.py \
+  --outdir .validation-corpus-ar1-low-200seed \
+  --noise-profile low --motion-profile rich-three-axis --noise-replicates 200 \
+  --noise-sample-counts 161 \
+  --orientation-noise-ar1-coefficients 0 0.8 \
+  --rate-noise-ar1-coefficients 0 0.8
+python scripts/validate_corpus.py \
+  .validation-corpus-ar1-low-200seed/manifest.json \
+  --output .validation-corpus-ar1-low-200seed/assessment.json
+```
+
 The 30-seed acquisition and noise sweeps can be regenerated with:
 
 ```bash
