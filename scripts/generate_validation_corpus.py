@@ -539,7 +539,7 @@ def main() -> None:
         nargs="+",
         default=(0.0,),
         metavar="PROBABILITY",
-        help="independent per-sample dropout probabilities in [0, 1)",
+        help="whole-row sample dropout probabilities in [0, 1)",
     )
     parser.add_argument(
         "--orientation-latencies-s",

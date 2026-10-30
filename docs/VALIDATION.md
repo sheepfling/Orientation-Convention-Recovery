@@ -25,9 +25,11 @@ per-axis standard deviations: orientation/rate `(0.0015 rad, 0.012 rad/s)`,
 `(0.003 rad, 0.025 rad/s)`, and `(0.006 rad, 0.05 rad/s)`. It uses the same seed
 set across all levels and motion profiles; increase `--noise-replicates` for a
 larger study. `--noise-sample-counts 161 401` compares 4-second and 10-second
-recordings at 25 ms spacing. Independent seeded streams for orientation and rate
-noise keep each shorter trial an exact prefix of its longer paired trial, and the
-assessment groups results by sample count and period.
+recordings at 25 ms spacing. Separate seeded streams for orientation/rate noise,
+timestamp jitter, and dropout are reused across acquisition-factor levels. Each
+shorter paired trial is an exact prefix of the longer one, with configured duration
+endpoints protected from dropout; the assessment groups results by sample count and
+period.
 
 Acquisition stress factors can be varied independently with
 `--timestamp-jitter-amplitudes-s`, `--dropout-probabilities`,
@@ -35,9 +37,10 @@ Acquisition stress factors can be varied independently with
 flag creates a factorial sweep, so case counts multiply across the selected motion,
 noise, duration, and acquisition conditions. Timestamp jitter is uniform in the
 requested symmetric amplitude and must be less than half the 25 ms sample period.
-Dropout is seeded per-sample and the manifest records both its requested probability
-and realized count; scheduled duration endpoints are retained to preserve paired
-duration comparisons. A positive channel latency means that channel's value at row
+Dropout removes a whole row (orientation and rate together), is seeded per sample,
+and the manifest records both its requested probability and realized count; scheduled
+duration endpoints are retained to preserve paired duration comparisons. A positive
+channel latency means that channel's value at row
 time `t` was generated from the analytic signal at `t - latency`. Thus a mismatch
 between orientation and rate latency is an intentional synchronization error, not
 an inferred convention. The assessment groups by requested acquisition condition,
@@ -131,6 +134,54 @@ is intentionally low and does not establish real-world precision or calibration.
 The run used Python 3.14.6, NumPy 2.5.2, SciPy 1.18.0, and package version
 `0.0.1a0.post1.dev18+gc54c51d8d`. The counts are synthetic diagnostic results only; do
 not interpret the 30/30 outcome as a statistical guarantee.
+
+## Acquisition-impairment snapshot
+
+Commit `6400de0` was evaluated on one rich-three-axis motion profile at low
+measurement noise, with five paired seeds at 4-second and 10-second durations. The
+factorial sweep varied timestamp jitter (0 or ±5 ms), per-sample dropout probability
+(0 or 0.35), orientation delay (0 or 50 ms), and rate delay (0 or 50 ms): 32
+conditions per seed, or 160 noisy cases plus the three control cases. The table groups
+trials by duration and the number of nonzero acquisition factors; it does not imply
+that factors have equal physical severity. The run used Python 3.14.6, NumPy 2.5.2,
+SciPy 1.18.0, and package version `0.0.1a0.post1.dev20+g6400de09c`.
+
+| Duration | Nonzero factors (of 4) | Trials | Correct recommendations | Abstentions | Wrong recommendations |
+|---|---:|---:|---:|---:|---:|
+| 4 seconds | 0 | 5 | 0 | 5 | 0 |
+| 4 seconds | 1 | 20 | 3 | 17 | 0 |
+| 4 seconds | 2 | 30 | 3 | 27 | 0 |
+| 4 seconds | 3 | 20 | 1 | 19 | 0 |
+| 4 seconds | 4 | 5 | 1 | 4 | 0 |
+| 10 seconds | 0 | 5 | 5 | 0 | 0 |
+| 10 seconds | 1 | 20 | 20 | 0 | 0 |
+| 10 seconds | 2 | 30 | 30 | 0 | 0 |
+| 10 seconds | 3 | 20 | 20 | 0 | 0 |
+| 10 seconds | 4 | 5 | 5 | 0 | 0 |
+
+All 88 recommendations among the 160 noisy trials were correct; there were no
+evidence misses or operational-class misses in this run. The 4-second results are
+non-monotonic: the unperturbed baseline abstained on all five trials, while some
+dropout conditions produced recommendations. Do not infer that dropout improves
+recovery; this needs investigation with more seeds and motion/noise profiles. At
+10 seconds all 80 trials were recommended correctly, including the combined maximum
+settings. This is a small, controlled synthetic diagnostic—not evidence of logger
+robustness, real-world accuracy, or confidence calibration.
+
+The run can be regenerated with:
+
+```bash
+python scripts/generate_validation_corpus.py \
+  --outdir .validation-acquisition-stress-20261030 \
+  --noise-profile low --motion-profile rich-three-axis --noise-replicates 5 \
+  --noise-sample-counts 161 401 \
+  --timestamp-jitter-amplitudes-s 0 0.005 \
+  --dropout-probabilities 0 0.35 \
+  --orientation-latencies-s 0 0.05 --rate-latencies-s 0 0.05
+python scripts/validate_corpus.py \
+  .validation-acquisition-stress-20261030/manifest.json \
+  --output .validation-acquisition-stress-20261030/assessment.json
+```
 
 ```bash
 python scripts/generate_validation_corpus.py
