@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from scripts.validate_corpus import MeasurementConditions, validate_corpus
+from scripts.generate_validation_corpus import MotionProfile, generate_corpus
+from scripts.validate_corpus import MeasurementConditions, main, validate_corpus
 
 
 def _manifest_case(quaternion_order: str, case_id: str) -> dict[str, object]:
@@ -57,9 +59,18 @@ def test_validation_corpus_counts_recovery_and_missed_label(tmp_path: Path) -> N
 
     assert result.summary.case_count == 2
     assert result.summary.resolved_correct == 1
-    assert result.summary.miss == 1
+    assert result.summary.evidence_miss == 1
+    assert result.summary.data_winner_miss == 1
+    assert result.summary.operational_miss == 1
+    assert result.summary.incorrect_evidence_sufficient == 1
     assert result.cases[0].truth_class_id in result.cases[0].evidence_contender_class_ids
     assert result.cases[1].truth_class_id not in result.cases[1].evidence_contender_class_ids
+    assert result.cases[0].operational_correct
+    assert not result.cases[1].operational_correct
+    assert result.condition_summaries[0].case_count == 2
+    assert result.condition_summaries[0].operational_miss == 1
+    assert result.condition_summaries[0].evidence_miss_rate == 0.5
+    assert result.condition_summaries[0].incorrect_evidence_sufficient_rate == 0.5
 ####
 
 
@@ -89,4 +100,30 @@ def test_measurement_conditions_reject_invalid_metadata(values: dict[str, object
     with pytest.raises(ValidationError):
         MeasurementConditions.model_validate(values)
     ####
+####
+
+
+def test_fail_on_miss_includes_wrong_operational_class(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = generate_corpus(
+        tmp_path / "single-axis-corpus",
+        motion_profiles=(MotionProfile.SINGLE_AXIS,),
+    )
+    assessment = validate_corpus(manifest)
+    output = tmp_path / "assessment.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["validate_corpus", str(manifest), "--output", str(output), "--fail-on-miss"],
+    )
+
+    assert assessment.summary.evidence_miss == 0
+    assert assessment.summary.operational_miss > 0
+    with pytest.raises(SystemExit) as exit_info:
+        main()
+    ####
+    assert exit_info.value.code == 1
+    assert output.is_file()
 ####

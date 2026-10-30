@@ -14,5 +14,6 @@ htmlcov/
 .pytest-tmp/
 schemas/
 .validation-corpus/
+.validation-corpus-*/
 *.pdf
 .idea/

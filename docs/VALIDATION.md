@@ -6,19 +6,40 @@ orientation and angular-rate CSV files whose conventions were recorded independe
 of this package's predictions. A source specification, reference implementation, or
 original logger configuration should establish each label.
 
-For a reproducible synthetic starting point, generate four cases from closed-form
-ZYX rotations and analytic body/world angular velocities. This generator does not
-import the inference package or its synthetic helper. The cases exercise quaternion
-storage variants, direction and rate-frame changes, rate-channel reordering,
-quaternion sign flips, irregular timestamps with dropped samples, Euler/degrees
-inputs, and seeded orientation/rate measurement noise. The noise case records its
-seed and standard deviations in the manifest and assessment. They remain
-**synthetic**, so passing them is not real-world validation.
+By default, the independent generator writes four cases from closed-form ZYX
+rotations and analytic body/world angular velocities. It does not import the
+inference package or its synthetic helper. These cases exercise quaternion storage
+variants, direction and rate-frame changes, rate-channel reordering, quaternion sign
+flips, irregular timestamps with dropped samples, Euler/degrees inputs, and seeded
+orientation/rate measurement noise. The noise case records its seed and standard
+deviations in the manifest and assessment. They remain **synthetic**, so passing
+them is not real-world validation.
 
 With the checked-in generator and current inference settings, the noisy case is
 ambiguous but retains the known class; the other three are uniquely resolved.
 This is a deterministic regression fixture, not a Monte Carlo robustness rate or
 confidence calibration.
+
+For a paired noise sensitivity study, the generator offers low, moderate, and high
+per-axis standard deviations: orientation/rate `(0.0015 rad, 0.012 rad/s)`,
+`(0.003 rad, 0.025 rad/s)`, and `(0.006 rad, 0.05 rad/s)`. It uses the same seed
+set across all levels and motion profiles; increase `--noise-replicates` for a
+larger study:
+
+```bash
+python scripts/generate_validation_corpus.py \
+  --noise-profile all --motion-profile all --noise-replicates 10
+python scripts/validate_corpus.py .validation-corpus/manifest.json
+```
+
+The motion profiles are rich three-axis, low-excitation, single-axis, and near-gimbal
+trajectories. The assessment groups replicates by representation, motion profile,
+and measurement conditions; it reports evidence, data-winner, and operational miss
+rates, plus indeterminate-confidence and evidence-insufficiency rates. It also
+records Python/platform/NumPy/SciPy/package versions. Evidence insufficiency is a
+diagnostic abstention signal; the API still returns an operational class. These
+paired synthetic trials are not accuracy estimates for real loggers or independent
+recording sessions.
 
 ```bash
 python scripts/generate_validation_corpus.py
@@ -67,11 +88,13 @@ python scripts/validate_corpus.py path/to/manifest.json --fail-on-miss
 ```
 
 The result distinguishes a unique correct evidence class, ambiguity that contains
-the known class, and a miss. It also counts misses for which the diagnostic evidence
-threshold was reached. Per-case measurement conditions, operational decoder, and
-data-winning classes are reported separately. If a config fixes a convention
-dimension, the case does **not** measure recovery of that dimension; record what was
-known before running inference.
+the known class, and an evidence miss (truth outside the contender classes). It
+separately reports when the data-winning or operational class differs from truth.
+Condition summaries expose each miss rate, evidence insufficiency, and false
+evidence sufficiency by group. `--fail-on-miss` exits nonzero for either an evidence
+miss or an operational miss. If a config fixes a convention dimension, the case
+does **not** measure recovery of that dimension; record what was known before
+running inference.
 
 Start with logs from at least two independent sources and include quiet motion,
 three-axis motion, timestamp jitter, missing samples, and sensor latency when those

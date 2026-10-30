@@ -6,13 +6,25 @@ import argparse
 import csv
 import json
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
 from numpy import arange, array, cos, cross, cumsum, float64, pi, sin, sqrt, stack, zeros
 from numpy.random import Generator, default_rng
 from numpy.typing import NDArray
 
 FloatArray = NDArray[float64]
+
+
+class MotionProfile(StrEnum):
+    """Independent analytic motion families used by the sensitivity harness."""
+
+    RICH_THREE_AXIS = "rich-three-axis"
+    LOW_EXCITATION = "low-excitation"
+    SINGLE_AXIS = "single-axis"
+    NEAR_GIMBAL = "near-gimbal"
+####
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +35,23 @@ class AnalyticMotion:
     body_rates_rad_s: FloatArray
     world_rates_rad_s: FloatArray
 ####
+
+
+@dataclass(frozen=True, slots=True)
+class NoiseProfile:
+    """Per-axis standard deviations for one seeded measurement-noise condition."""
+
+    name: Literal["low", "moderate", "high"]
+    orientation_sigma_rad: float
+    rate_sigma_rad_s: float
+####
+
+
+NOISE_PROFILES: tuple[NoiseProfile, ...] = (
+    NoiseProfile("low", 0.0015, 0.012),
+    NoiseProfile("moderate", 0.003, 0.025),
+    NoiseProfile("high", 0.006, 0.05),
+)
 
 
 def _axis_quaternion(axis: int, angles: FloatArray) -> FloatArray:
@@ -42,8 +71,11 @@ def _multiply_quaternions(left: FloatArray, right: FloatArray) -> FloatArray:
 ####
 
 
-def analytic_motion(time_s: FloatArray) -> AnalyticMotion:
-    """Use Rz(psi) Ry(theta) Rx(phi) and its closed-form body angular velocity."""
+def analytic_motion(
+    time_s: FloatArray,
+    profile: MotionProfile = MotionProfile.RICH_THREE_AXIS,
+) -> AnalyticMotion:
+    """Use closed-form ZYX rotations and body rates for a named motion family."""
 
     phi = 0.33 * sin(1.3 * time_s) + 0.09 * cos(2.1 * time_s)
     theta = 0.25 * sin(0.8 * time_s) + 0.06 * cos(1.7 * time_s)
@@ -51,6 +83,24 @@ def analytic_motion(time_s: FloatArray) -> AnalyticMotion:
     phi_dot = 0.429 * cos(1.3 * time_s) - 0.189 * sin(2.1 * time_s)
     theta_dot = 0.20 * cos(0.8 * time_s) - 0.102 * sin(1.7 * time_s)
     psi_dot = 0.451 * cos(1.1 * time_s) - 0.042 * sin(0.6 * time_s)
+    if profile is MotionProfile.LOW_EXCITATION:
+        phi *= 0.08
+        theta *= 0.08
+        psi *= 0.08
+        phi_dot *= 0.08
+        theta_dot *= 0.08
+        psi_dot *= 0.08
+    ####
+    if profile is MotionProfile.SINGLE_AXIS:
+        phi = zeros(len(time_s), dtype=float64)
+        theta = zeros(len(time_s), dtype=float64)
+        phi_dot = zeros(len(time_s), dtype=float64)
+        theta_dot = zeros(len(time_s), dtype=float64)
+    ####
+    if profile is MotionProfile.NEAR_GIMBAL:
+        theta = pi / 2.0 - 0.035 + 0.02 * sin(0.8 * time_s) + 0.006 * cos(1.7 * time_s)
+        theta_dot = 0.016 * cos(0.8 * time_s) - 0.0102 * sin(1.7 * time_s)
+    ####
     body_rates = stack(
         (
             phi_dot - psi_dot * sin(theta),
@@ -118,9 +168,24 @@ def _write_csv(
 ####
 
 
-def generate_corpus(outdir: Path) -> Path:
-    """Write independently calculated clean, jittered, noisy, and Euler cases."""
+def generate_corpus(
+    outdir: Path,
+    *,
+    noise_profiles: tuple[NoiseProfile, ...] = (NOISE_PROFILES[0],),
+    noise_replicates: int = 1,
+    motion_profiles: tuple[MotionProfile, ...] = (MotionProfile.RICH_THREE_AXIS,),
+) -> Path:
+    """Write analytic convention cases across optional noise and motion profiles."""
 
+    if not noise_profiles:
+        raise ValueError("At least one noise profile is required.")
+    ####
+    if not motion_profiles:
+        raise ValueError("At least one motion profile is required.")
+    ####
+    if noise_replicates < 1:
+        raise ValueError("noise_replicates must be positive.")
+    ####
     outdir.mkdir(parents=True, exist_ok=False)
     regular = analytic_motion(arange(101, dtype=float64) * 0.025)
     jitter = 0.025 + 0.003 * sin(arange(120, dtype=float64) * 0.7)
@@ -128,20 +193,6 @@ def generate_corpus(outdir: Path) -> Path:
     keep = arange(len(jittered_time)) % 13 != 7
     jittered = analytic_motion(jittered_time[keep])
     euler = analytic_motion(arange(91, dtype=float64) * 0.03)
-    noisy = analytic_motion(arange(161, dtype=float64) * 0.025)
-    noise_seed = 20261030
-    attitude_noise_sigma_rad = 0.0015
-    rate_noise_sigma_rad_s = 0.012
-    noise_random = default_rng(noise_seed)
-    noisy_quaternions = _noisy_quaternions(
-        noisy.quaternion_xyzw,
-        sigma_rad=attitude_noise_sigma_rad,
-        random=noise_random,
-    )
-    noisy_rates = noisy.body_rates_rad_s + noise_random.normal(
-        0.0, rate_noise_sigma_rad_s, noisy.body_rates_rad_s.shape
-    )
-
     _write_csv(
         outdir / "quaternion_body.csv",
         regular,
@@ -164,7 +215,62 @@ def generate_corpus(outdir: Path) -> Path:
         euler.euler_xyz_rad * (180.0 / pi),
         euler.body_rates_rad_s * (180.0 / pi),
     )
-    _write_csv(outdir / "quaternion_body_noisy.csv", noisy, noisy_quaternions, noisy_rates)
+
+    noisy_cases: list[dict[str, object]] = []
+    noise_times = arange(161, dtype=float64) * 0.025
+    for motion_profile in motion_profiles:
+        for profile in noise_profiles:
+            for replicate_index in range(noise_replicates):
+                noise_seed = 20261030 + replicate_index
+                noise_random = default_rng(noise_seed)
+                noisy = analytic_motion(noise_times, motion_profile)
+                noisy_quaternions = _noisy_quaternions(
+                    noisy.quaternion_xyzw,
+                    sigma_rad=profile.orientation_sigma_rad,
+                    random=noise_random,
+                )
+                noisy_rates = noisy.body_rates_rad_s + noise_random.normal(
+                    0.0, profile.rate_sigma_rad_s, noisy.body_rates_rad_s.shape
+                )
+                case_id = (
+                    f"analytic-noisy-{motion_profile.value}-{profile.name}-"
+                    f"{replicate_index + 1:03d}"
+                )
+                csv_name = (
+                    f"quaternion_noisy_{motion_profile.value}_{profile.name}_"
+                    f"{replicate_index + 1:03d}.csv"
+                )
+                _write_csv(outdir / csv_name, noisy, noisy_quaternions, noisy_rates)
+                noisy_cases.append(
+                    {
+                        "case_id": case_id,
+                        "csv": csv_name,
+                        "label_source": (
+                            "analytic ZYX generator with seeded measurement noise: "
+                            "scripts/generate_validation_corpus.py"
+                        ),
+                        "measurement_conditions": {
+                            "motion_profile_id": motion_profile.value,
+                            "orientation_noise_sigma_rad": profile.orientation_sigma_rad,
+                            "rate_noise_sigma_rad_s": profile.rate_sigma_rad_s,
+                            "noise_seed": noise_seed,
+                        },
+                        "representation": "quaternion",
+                        "orientation_columns": ["a0", "a1", "a2", "a3"],
+                        "rate_columns": ["r0", "r1", "r2"],
+                        "time_column": "time_s",
+                        "truth": {
+                            "attitude_direction": "body_to_world",
+                            "quaternion_order": "scalar_last",
+                            "rate_frame": "body",
+                            "rate_order": "pqr",
+                            "rate_unit": "radians_per_second",
+                        },
+                    }
+                )
+            ####
+        ####
+    ####
 
     manifest = {
         "schema_version": 1,
@@ -173,6 +279,9 @@ def generate_corpus(outdir: Path) -> Path:
                 "case_id": "analytic-quaternion-body",
                 "csv": "quaternion_body.csv",
                 "label_source": "analytic ZYX generator: scripts/generate_validation_corpus.py",
+                "measurement_conditions": {
+                    "motion_profile_id": MotionProfile.RICH_THREE_AXIS.value,
+                },
                 "representation": "quaternion",
                 "orientation_columns": ["a0", "a1", "a2", "a3"],
                 "rate_columns": ["r0", "r1", "r2"],
@@ -190,6 +299,7 @@ def generate_corpus(outdir: Path) -> Path:
                 "csv": "quaternion_world_jittered.csv",
                 "label_source": "analytic ZYX generator: scripts/generate_validation_corpus.py",
                 "measurement_conditions": {
+                    "motion_profile_id": MotionProfile.RICH_THREE_AXIS.value,
                     "timestamp_jitter_amplitude_s": 0.003,
                     "dropped_sample_count": int((~keep).sum()),
                 },
@@ -209,6 +319,9 @@ def generate_corpus(outdir: Path) -> Path:
                 "case_id": "analytic-euler-degrees",
                 "csv": "euler_degrees.csv",
                 "label_source": "analytic ZYX generator: scripts/generate_validation_corpus.py",
+                "measurement_conditions": {
+                    "motion_profile_id": MotionProfile.RICH_THREE_AXIS.value,
+                },
                 "representation": "euler",
                 "orientation_columns": ["a0", "a1", "a2"],
                 "rate_columns": ["r0", "r1", "r2"],
@@ -232,30 +345,7 @@ def generate_corpus(outdir: Path) -> Path:
                     }
                 },
             },
-            {
-                "case_id": "analytic-quaternion-body-noisy",
-                "csv": "quaternion_body_noisy.csv",
-                "label_source": (
-                    "analytic ZYX generator with seeded measurement noise: "
-                    "scripts/generate_validation_corpus.py"
-                ),
-                "measurement_conditions": {
-                    "orientation_noise_sigma_rad": attitude_noise_sigma_rad,
-                    "rate_noise_sigma_rad_s": rate_noise_sigma_rad_s,
-                    "noise_seed": noise_seed,
-                },
-                "representation": "quaternion",
-                "orientation_columns": ["a0", "a1", "a2", "a3"],
-                "rate_columns": ["r0", "r1", "r2"],
-                "time_column": "time_s",
-                "truth": {
-                    "attitude_direction": "body_to_world",
-                    "quaternion_order": "scalar_last",
-                    "rate_frame": "body",
-                    "rate_order": "pqr",
-                    "rate_unit": "radians_per_second",
-                },
-            },
+            *noisy_cases,
         ],
     }
     manifest_path = outdir / "manifest.json"
@@ -269,8 +359,43 @@ def main() -> None:
     parser.add_argument(
         "--outdir", type=Path, default=Path(".validation-corpus"), help="new output directory"
     )
+    parser.add_argument(
+        "--noise-profile",
+        choices=("low", "moderate", "high", "all"),
+        default="low",
+        help="measurement-noise profile to include",
+    )
+    parser.add_argument(
+        "--noise-replicates",
+        type=int,
+        default=1,
+        help="seeded realizations per noise profile",
+    )
+    parser.add_argument(
+        "--motion-profile",
+        choices=(*tuple(profile.value for profile in MotionProfile), "all"),
+        default=MotionProfile.RICH_THREE_AXIS.value,
+        help="analytic motion family to include in noisy cases",
+    )
     args = parser.parse_args()
-    print(generate_corpus(args.outdir))
+    profiles = (
+        NOISE_PROFILES
+        if args.noise_profile == "all"
+        else tuple(profile for profile in NOISE_PROFILES if profile.name == args.noise_profile)
+    )
+    motion_profiles = (
+        tuple(MotionProfile)
+        if args.motion_profile == "all"
+        else tuple(profile for profile in MotionProfile if profile.value == args.motion_profile)
+    )
+    print(
+        generate_corpus(
+            args.outdir,
+            noise_profiles=profiles,
+            noise_replicates=args.noise_replicates,
+            motion_profiles=motion_profiles,
+        )
+    )
 ####
 
 
