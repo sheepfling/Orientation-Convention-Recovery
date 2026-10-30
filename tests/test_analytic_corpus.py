@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
+from numpy.random import default_rng
 
 from attitude_convention_inference.math_utils import rotation_from_quat, rotation_rotvecs
 from scripts.generate_validation_corpus import (
@@ -13,6 +14,7 @@ from scripts.generate_validation_corpus import (
     MotionProfile,
     NoiseProfile,
     analytic_motion,
+    correlated_gaussian_noise,
     generate_corpus,
 )
 from scripts.validate_corpus import validate_corpus
@@ -31,6 +33,69 @@ def test_analytic_rates_match_finite_difference_rotations(profile: MotionProfile
 
     np.testing.assert_allclose(analytic.body_rates_rad_s, body_rates, atol=1.0e-9)
     np.testing.assert_allclose(analytic.world_rates_rad_s, world_rates, atol=1.0e-9)
+####
+
+
+def test_ar1_noise_zero_correlation_preserves_white_noise_sequence() -> None:
+    seed = 723
+    actual = correlated_gaussian_noise(
+        default_rng(seed),
+        sigma=0.7,
+        sample_count=41,
+        dimension_count=3,
+        ar1_coefficient=0.0,
+    )
+    expected = default_rng(seed).normal(0.0, 0.7, (41, 3)).astype(np.float64)
+
+    np.testing.assert_array_equal(actual, expected)
+####
+
+
+def test_ar1_noise_rejects_invalid_parameters() -> None:
+    with pytest.raises(ValueError, match="sigma must be finite and non-negative"):
+        correlated_gaussian_noise(
+            default_rng(1),
+            sigma=-0.1,
+            sample_count=3,
+            dimension_count=3,
+            ar1_coefficient=0.0,
+        )
+    ####
+    with pytest.raises(ValueError, match="sample_count and dimension_count must be positive"):
+        correlated_gaussian_noise(
+            default_rng(1),
+            sigma=0.1,
+            sample_count=0,
+            dimension_count=3,
+            ar1_coefficient=0.0,
+        )
+    ####
+    with pytest.raises(ValueError, match="ar1_coefficient must be strictly between -1 and 1"):
+        correlated_gaussian_noise(
+            default_rng(1),
+            sigma=0.1,
+            sample_count=3,
+            dimension_count=3,
+            ar1_coefficient=1.0,
+        )
+    ####
+####
+
+
+@pytest.mark.parametrize("coefficient", (0.75, -0.65))
+def test_ar1_noise_has_configured_lag_one_correlation(coefficient: float) -> None:
+    samples = correlated_gaussian_noise(
+        default_rng(81),
+        sigma=0.7,
+        sample_count=30_000,
+        dimension_count=3,
+        ar1_coefficient=coefficient,
+    )
+
+    assert float(np.std(samples[:, 0])) == pytest.approx(0.7, abs=0.02)
+    assert float(np.corrcoef(samples[:-1, 0], samples[1:, 0])[0, 1]) == pytest.approx(
+        coefficient, abs=0.02
+    )
 ####
 
 
@@ -164,6 +229,8 @@ def test_paired_acquisition_perturbations_are_recorded_and_reproducible(tmp_path
             dropout_probabilities=(0.15,),
             orientation_latencies_s=(0.01,),
             rate_latencies_s=(0.025,),
+            orientation_noise_ar1_coefficients=(0.6,),
+            rate_noise_ar1_coefficients=(-0.4,),
         )
     ####
 
@@ -196,6 +263,8 @@ def test_paired_acquisition_perturbations_are_recorded_and_reproducible(tmp_path
         assert condition.measurement_conditions.timestamp_jitter_amplitude_s == 0.002
         assert condition.measurement_conditions.orientation_latency_s == 0.01
         assert condition.measurement_conditions.rate_latency_s == 0.025
+        assert condition.measurement_conditions.orientation_noise_ar1_coefficient == 0.6
+        assert condition.measurement_conditions.rate_noise_ar1_coefficient == -0.4
         assert condition.dropped_sample_count_min == min(
             case.measurement_conditions.dropped_sample_count or 0 for case in cases
         )
@@ -228,11 +297,40 @@ def test_paired_acquisition_perturbations_are_recorded_and_reproducible(tmp_path
             assert np.all(np.diff(timestamps) > 0.0)
         ####
         conditions = short_case["measurement_conditions"]
+        assert conditions["orientation_noise_ar1_coefficient"] == 0.6
+        assert conditions["rate_noise_ar1_coefficient"] == -0.4
         assert (
             conditions["observed_sample_count"] + conditions["dropped_sample_count"]
             == conditions["sample_count"]
         )
     ####
+####
+
+
+def test_ar1_conditions_are_separate_in_validation_summary(tmp_path: Path) -> None:
+    manifest = generate_corpus(
+        tmp_path / "ar1-factor-corpus",
+        noise_sample_counts=(41,),
+        orientation_noise_ar1_coefficients=(0.0, 0.7),
+        rate_noise_ar1_coefficients=(-0.5, 0.0),
+    )
+
+    assessment = validate_corpus(manifest)
+    summaries = [
+        summary
+        for summary in assessment.condition_summaries
+        if summary.measurement_conditions.sample_count == 41
+    ]
+
+    assert len(summaries) == 4
+    assert {
+        (
+            summary.measurement_conditions.orientation_noise_ar1_coefficient,
+            summary.measurement_conditions.rate_noise_ar1_coefficient,
+        )
+        for summary in summaries
+    } == {(0.0, -0.5), (0.0, 0.0), (0.7, -0.5), (0.7, 0.0)}
+    assert all(summary.case_count == 1 for summary in summaries)
 ####
 
 
@@ -287,6 +385,21 @@ def test_impossible_dropout_realization_fails_before_creating_output(tmp_path: P
             noise_sample_counts=(41,),
             dropout_probabilities=(0.95,),
         )
+    ####
+
+    assert not outdir.exists()
+####
+
+
+@pytest.mark.parametrize("coefficient", (-1.0, 1.0, float("nan"), float("inf")))
+def test_invalid_ar1_coefficients_fail_before_creating_output(
+    tmp_path: Path,
+    coefficient: float,
+) -> None:
+    outdir = tmp_path / "invalid-ar1-corpus"
+
+    with pytest.raises(ValueError, match="strictly between -1 and 1"):
+        generate_corpus(outdir, orientation_noise_ar1_coefficients=(coefficient,))
     ####
 
     assert not outdir.exists()

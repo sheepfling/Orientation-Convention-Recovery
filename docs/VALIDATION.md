@@ -189,6 +189,76 @@ high-noise cases abstained; the 29 evidence-insufficient cases were all high-noi
 These paired synthetic results help expose sensitivity, but do not establish
 real-world accuracy, logger robustness, or confidence calibration.
 
+## Temporally correlated measurement-noise stress
+
+The independent generator also supports stationary Gaussian AR(1) perturbations
+for the three orientation rotation-vector components and three angular-rate
+components. `--orientation-noise-ar1-coefficients` and
+`--rate-noise-ar1-coefficients` accept one or more sample-lag coefficients
+`rho` in `(-1, 1)`. A coefficient of zero is white noise and preserves the
+generator's previous seeded sequence exactly. Positive values model slowly
+varying measurement error; negative values model alternating error. Each
+coefficient is the correlation between adjacent scheduled samples, not a
+continuous-time constant. Marginal standard deviations remain those of the
+selected noise profile. The manifest and assessment retain both coefficients,
+and summaries keep different correlation conditions separate.
+
+Noise is generated on the scheduled sample grid before timestamp jitter and row
+dropout are applied. Thus, after a row is removed, adjacent observed rows may
+span multiple scheduled lags. Seeds and underlying innovation draws are paired
+across coefficient levels, as well as across the existing profile and duration
+factors. For example, this compares white and positively correlated orientation
+and rate noise over 30 paired 4-second trials per combination:
+
+```bash
+python scripts/generate_validation_corpus.py \
+  --outdir .validation-corpus-ar1-30seed \
+  --noise-profile all --motion-profile rich-three-axis --noise-replicates 30 \
+  --noise-sample-counts 161 \
+  --orientation-noise-ar1-coefficients 0 0.8 \
+  --rate-noise-ar1-coefficients 0 0.8
+python scripts/validate_corpus.py \
+  .validation-corpus-ar1-30seed/manifest.json \
+  --output .validation-corpus-ar1-30seed/assessment.json
+```
+
+The factorial sweep produces 12 correlation/noise-profile conditions, or 360
+noisy cases. AR(1) is a controlled stress model, not a claim that every sensor's
+errors follow this process. The evaluator's likelihood still has approximate
+i.i.d. assumptions, so these runs are specifically useful for checking whether
+evidence sufficiency or recommendations become misleading under temporal
+dependence. Report any such result as a synthetic warning; do not tune the
+inference thresholds solely to fit this generator.
+
+### Observed AR(1) snapshot
+
+On 2026-10-30, 30 seeds were evaluated for each noise profile and each paired
+orientation/rate coefficient combination at 161 samples (4 seconds): 360 noisy
+trials plus three control cases. `rho=0.8` was compared with white noise
+`rho=0` independently on each channel. All 360 true classes remained in their
+evidence contender sets; there were no operational misses, evidence misses, or
+incorrect evidence-sufficient cases. The recommendation counts below are out of
+30 per condition; all recommendations were correct.
+
+| Noise profile | `(rho_orientation, rho_rate) = (0, 0)` | `(0, 0.8)` | `(0.8, 0)` | `(0.8, 0.8)` |
+|---|---:|---:|---:|---:|
+| Low | 0 | 0 | 27 | 14 |
+| Moderate | 0 | 0 | 0 | 0 |
+| High | 0 | 0 | 0 | 0 |
+
+Across the 360 noisy trials, the evaluator recommended 41 and abstained on 319;
+all 360 heuristic confidence labels remained indeterminate. The 32
+evidence-insufficient cases occurred in high-noise conditions. Correlated
+orientation noise therefore changed decision coverage substantially at low
+marginal noise, despite no false recommendation in these 30-seed cells. That is
+a useful warning about sensitivity to dependence, not proof of calibration or
+overconfidence: this finite synthetic run cannot establish the false-positive
+rate, and the evidence calculation still uses an approximate i.i.d. likelihood.
+The three control cases bring the complete assessment to 44 recommendations
+(including those controls) and 319 abstentions. The run used Python 3.14.6,
+NumPy 2.5.2, SciPy 1.18.0, and inference package version
+`0.0.1a0.post1.dev20+g6400de09c`.
+
 The 30-seed acquisition and noise sweeps can be regenerated with:
 
 ```bash

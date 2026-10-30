@@ -37,6 +37,10 @@ class MeasurementConditions(BaseModel):
     rate_latency_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     orientation_noise_sigma_rad: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     rate_noise_sigma_rad_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
+    orientation_noise_ar1_coefficient: float = Field(
+        default=0.0, gt=-1.0, lt=1.0, allow_inf_nan=False
+    )
+    rate_noise_ar1_coefficient: float = Field(default=0.0, gt=-1.0, lt=1.0, allow_inf_nan=False)
     noise_seed: int | None = Field(default=None, ge=0)
     sample_count: int | None = Field(default=None, gt=0)
     observed_sample_count: int | None = Field(default=None, gt=0)
@@ -316,10 +320,14 @@ class _ConditionGroupKey:
     rate_latency_s: float
     orientation_noise_sigma_rad: float
     rate_noise_sigma_rad_s: float
+    orientation_noise_ar1_coefficient: float
+    rate_noise_ar1_coefficient: float
     sample_count: int | None
     sample_period_s: float | None
 
-    def ordering_key(self) -> tuple[str, str, float, float, float, float, float, float, int, float]:
+    def ordering_key(
+        self,
+    ) -> tuple[str, str, float, float, float, float, float, float, float, float, int, float]:
         """Return a stable total ordering for serialized summaries."""
 
         return (
@@ -331,6 +339,8 @@ class _ConditionGroupKey:
             self.rate_latency_s,
             self.orientation_noise_sigma_rad,
             self.rate_noise_sigma_rad_s,
+            self.orientation_noise_ar1_coefficient,
+            self.rate_noise_ar1_coefficient,
             self.sample_count if self.sample_count is not None else -1,
             self.sample_period_s if self.sample_period_s is not None else -1.0,
         )
@@ -349,6 +359,8 @@ def _condition_group_key(assessment: CaseAssessment) -> _ConditionGroupKey:
         rate_latency_s=conditions.rate_latency_s,
         orientation_noise_sigma_rad=conditions.orientation_noise_sigma_rad,
         rate_noise_sigma_rad_s=conditions.rate_noise_sigma_rad_s,
+        orientation_noise_ar1_coefficient=conditions.orientation_noise_ar1_coefficient,
+        rate_noise_ar1_coefficient=conditions.rate_noise_ar1_coefficient,
         sample_count=conditions.sample_count,
         sample_period_s=conditions.sample_period_s,
     )
