@@ -6,12 +6,19 @@ orientation and angular-rate CSV files whose conventions were recorded independe
 of this package's predictions. A source specification, reference implementation, or
 original logger configuration should establish each label.
 
-For a reproducible synthetic starting point, generate three cases from closed-form
+For a reproducible synthetic starting point, generate four cases from closed-form
 ZYX rotations and analytic body/world angular velocities. This generator does not
 import the inference package or its synthetic helper. The cases exercise quaternion
 storage variants, direction and rate-frame changes, rate-channel reordering,
-quaternion sign flips, irregular timestamps with dropped samples, and Euler/degrees
-inputs. They remain **synthetic**, so passing them is not real-world validation.
+quaternion sign flips, irregular timestamps with dropped samples, Euler/degrees
+inputs, and seeded orientation/rate measurement noise. The noise case records its
+seed and standard deviations in the manifest and assessment. They remain
+**synthetic**, so passing them is not real-world validation.
+
+With the checked-in generator and current inference settings, the noisy case is
+ambiguous but retains the known class; the other three are uniquely resolved.
+This is a deterministic regression fixture, not a Monte Carlo robustness rate or
+confidence calibration.
 
 ```bash
 python scripts/generate_validation_corpus.py
@@ -61,9 +68,10 @@ python scripts/validate_corpus.py path/to/manifest.json --fail-on-miss
 
 The result distinguishes a unique correct evidence class, ambiguity that contains
 the known class, and a miss. It also counts misses for which the diagnostic evidence
-threshold was reached. The operational decoder and data-winning classes are reported
-separately. If a config fixes a convention dimension, the case does **not** measure
-recovery of that dimension; record what was known before running inference.
+threshold was reached. Per-case measurement conditions, operational decoder, and
+data-winning classes are reported separately. If a config fixes a convention
+dimension, the case does **not** measure recovery of that dimension; record what was
+known before running inference.
 
 Start with logs from at least two independent sources and include quiet motion,
 three-axis motion, timestamp jitter, missing samples, and sensor latency when those

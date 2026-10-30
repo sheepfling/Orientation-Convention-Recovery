@@ -8,7 +8,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from numpy import arange, array, cos, cross, cumsum, float64, pi, sin, stack, zeros
+from numpy import arange, array, cos, cross, cumsum, float64, pi, sin, sqrt, stack, zeros
+from numpy.random import Generator, default_rng
 from numpy.typing import NDArray
 
 FloatArray = NDArray[float64]
@@ -76,6 +77,33 @@ def analytic_motion(time_s: FloatArray) -> AnalyticMotion:
 ####
 
 
+def _noisy_quaternions(
+    quaternions_xyzw: FloatArray,
+    *,
+    sigma_rad: float,
+    random: Generator,
+) -> FloatArray:
+    """Apply seeded, isotropic small-rotation measurement noise independently per sample."""
+
+    rotation_vectors = random.normal(0.0, sigma_rad, (len(quaternions_xyzw), 3)).astype(float64)
+    angles = sqrt((rotation_vectors * rotation_vectors).sum(axis=1))
+    factors = zeros(len(angles), dtype=float64)
+    nonzero = angles > 0.0
+    factors[nonzero] = sin(angles[nonzero] / 2.0) / angles[nonzero]
+    factors[~nonzero] = 0.5
+    noise_quaternions = stack(
+        (
+            rotation_vectors[:, 0] * factors,
+            rotation_vectors[:, 1] * factors,
+            rotation_vectors[:, 2] * factors,
+            cos(angles / 2.0),
+        ),
+        axis=1,
+    )
+    return _multiply_quaternions(noise_quaternions, quaternions_xyzw)
+####
+
+
 def _write_csv(
     path: Path, motion: AnalyticMotion, orientation: FloatArray, rates: FloatArray
 ) -> None:
@@ -91,7 +119,7 @@ def _write_csv(
 
 
 def generate_corpus(outdir: Path) -> Path:
-    """Write three independently calculated synthetic cases and their labels."""
+    """Write independently calculated clean, jittered, noisy, and Euler cases."""
 
     outdir.mkdir(parents=True, exist_ok=False)
     regular = analytic_motion(arange(101, dtype=float64) * 0.025)
@@ -100,6 +128,19 @@ def generate_corpus(outdir: Path) -> Path:
     keep = arange(len(jittered_time)) % 13 != 7
     jittered = analytic_motion(jittered_time[keep])
     euler = analytic_motion(arange(91, dtype=float64) * 0.03)
+    noisy = analytic_motion(arange(161, dtype=float64) * 0.025)
+    noise_seed = 20261030
+    attitude_noise_sigma_rad = 0.0015
+    rate_noise_sigma_rad_s = 0.012
+    noise_random = default_rng(noise_seed)
+    noisy_quaternions = _noisy_quaternions(
+        noisy.quaternion_xyzw,
+        sigma_rad=attitude_noise_sigma_rad,
+        random=noise_random,
+    )
+    noisy_rates = noisy.body_rates_rad_s + noise_random.normal(
+        0.0, rate_noise_sigma_rad_s, noisy.body_rates_rad_s.shape
+    )
 
     _write_csv(
         outdir / "quaternion_body.csv",
@@ -123,6 +164,7 @@ def generate_corpus(outdir: Path) -> Path:
         euler.euler_xyz_rad * (180.0 / pi),
         euler.body_rates_rad_s * (180.0 / pi),
     )
+    _write_csv(outdir / "quaternion_body_noisy.csv", noisy, noisy_quaternions, noisy_rates)
 
     manifest = {
         "schema_version": 1,
@@ -147,6 +189,10 @@ def generate_corpus(outdir: Path) -> Path:
                 "case_id": "analytic-quaternion-world-jittered",
                 "csv": "quaternion_world_jittered.csv",
                 "label_source": "analytic ZYX generator: scripts/generate_validation_corpus.py",
+                "measurement_conditions": {
+                    "timestamp_jitter_amplitude_s": 0.003,
+                    "dropped_sample_count": int((~keep).sum()),
+                },
                 "representation": "quaternion",
                 "orientation_columns": ["a0", "a1", "a2", "a3"],
                 "rate_columns": ["r0", "r1", "r2"],
@@ -184,6 +230,30 @@ def generate_corpus(outdir: Path) -> Path:
                         "rate_units": ["radians_per_second", "degrees_per_second"],
                         "angle_units": ["radians", "degrees"],
                     }
+                },
+            },
+            {
+                "case_id": "analytic-quaternion-body-noisy",
+                "csv": "quaternion_body_noisy.csv",
+                "label_source": (
+                    "analytic ZYX generator with seeded measurement noise: "
+                    "scripts/generate_validation_corpus.py"
+                ),
+                "measurement_conditions": {
+                    "orientation_noise_sigma_rad": attitude_noise_sigma_rad,
+                    "rate_noise_sigma_rad_s": rate_noise_sigma_rad_s,
+                    "noise_seed": noise_seed,
+                },
+                "representation": "quaternion",
+                "orientation_columns": ["a0", "a1", "a2", "a3"],
+                "rate_columns": ["r0", "r1", "r2"],
+                "time_column": "time_s",
+                "truth": {
+                    "attitude_direction": "body_to_world",
+                    "quaternion_order": "scalar_last",
+                    "rate_frame": "body",
+                    "rate_order": "pqr",
+                    "rate_unit": "radians_per_second",
                 },
             },
         ],

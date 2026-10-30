@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
-from scripts.validate_corpus import validate_corpus
+from scripts.validate_corpus import MeasurementConditions, validate_corpus
 
 
 def _manifest_case(quaternion_order: str, case_id: str) -> dict[str, object]:
@@ -69,5 +70,23 @@ def test_validation_corpus_rejects_duplicate_case_ids(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="unique"):
         validate_corpus(manifest)
+    ####
+####
+
+
+@pytest.mark.parametrize(
+    "values",
+    (
+        {"timestamp_jitter_amplitude_s": -0.001},
+        {"dropped_sample_count": -1},
+        {"orientation_noise_sigma_rad": float("nan")},
+        {"rate_noise_sigma_rad_s": float("inf")},
+        {"noise_seed": -1},
+        {"unrecognized_condition": True},
+    ),
+)
+def test_measurement_conditions_reject_invalid_metadata(values: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        MeasurementConditions.model_validate(values)
     ####
 ####

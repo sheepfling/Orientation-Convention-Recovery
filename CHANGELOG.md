@@ -4,6 +4,8 @@
 
 - Added a repeatable alpha-tag public-contract audit to the one-command CI
   pipeline without tracking generated schemas.
+- Extended the independent analytic validation corpus with reproducible noisy
+  orientation/rate measurements and typed per-case conditions.
 - Split inference policy selection, evidence sufficiency, dimension assessments,
   diagnostics, and report assembly into focused modules.
 - Separated policy configuration, convention hypotheses, and report contracts

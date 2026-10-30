@@ -16,6 +16,19 @@ from attitude_convention_inference import (
 )
 
 
+class MeasurementConditions(BaseModel):
+    """Typed measurement perturbations recorded for one validation trajectory."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    timestamp_jitter_amplitude_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
+    dropped_sample_count: int = Field(default=0, ge=0)
+    orientation_noise_sigma_rad: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
+    rate_noise_sigma_rad_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
+    noise_seed: int | None = Field(default=None, ge=0)
+####
+
+
 class ValidationCase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -28,6 +41,7 @@ class ValidationCase(BaseModel):
     orientation_columns: tuple[str, ...] | None = None
     rate_columns: tuple[str, ...] | None = None
     time_column: str | None = None
+    measurement_conditions: MeasurementConditions = Field(default_factory=MeasurementConditions)
 
     @field_validator("truth", mode="before")
     @classmethod
@@ -68,6 +82,7 @@ class CaseAssessment(BaseModel):
 
     case_id: str
     label_source: str
+    measurement_conditions: MeasurementConditions
     sample_count: int
     hypothesis_count: int
     truth_class_id: str
@@ -146,6 +161,7 @@ def validate_corpus(manifest_path: Path) -> CorpusAssessment:
             CaseAssessment(
                 case_id=case.case_id,
                 label_source=case.label_source,
+                measurement_conditions=case.measurement_conditions,
                 sample_count=report.sample_count,
                 hypothesis_count=report.hypothesis_count,
                 truth_class_id=truth_class_id,

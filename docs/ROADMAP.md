@@ -10,7 +10,8 @@ implementation consistency, not recovery accuracy on outside data.
 - The sdist-to-wheel build, Twine check, and installed-wheel smoke test pass on
   local Windows/Python 3.14. The Python 3.11/3.12 Linux/Windows matrix remains a
   separate release gate.
-- The analytic synthetic corpus has labeled recovery/ambiguity/miss evaluation;
+- The analytic synthetic corpus has labeled recovery/ambiguity/miss evaluation,
+  including seeded orientation/rate noise with recorded measurement conditions;
   it is not evidence of recovery accuracy on independent systems.
 - Exact-class grouping and evidence prefixes avoid known quadratic paths.
 - Exact symmetry grouping, ranking, operational selection, evidence summaries,

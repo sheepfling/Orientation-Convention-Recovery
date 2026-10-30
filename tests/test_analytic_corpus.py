@@ -25,12 +25,33 @@ def test_analytic_rates_match_finite_difference_rotations() -> None:
 ####
 
 
-def test_generated_analytic_corpus_recovers_all_three_cases(tmp_path: Path) -> None:
+def test_generated_analytic_corpus_reports_noisy_ambiguity_reproducibly(tmp_path: Path) -> None:
     manifest = generate_corpus(tmp_path / "analytic-corpus")
+    repeated_manifest = generate_corpus(tmp_path / "repeated-corpus")
+
+    for filename in (
+        "manifest.json",
+        "quaternion_body.csv",
+        "quaternion_world_jittered.csv",
+        "euler_degrees.csv",
+        "quaternion_body_noisy.csv",
+    ):
+        assert (manifest.parent / filename).read_bytes() == (
+            repeated_manifest.parent / filename
+        ).read_bytes()
+    ####
 
     assessment = validate_corpus(manifest)
 
-    assert assessment.summary.case_count == 3
+    assert assessment.summary.case_count == 4
     assert assessment.summary.resolved_correct == 3
+    assert assessment.summary.ambiguous_contains_truth == 1
     assert assessment.summary.miss == 0
+    assert assessment.cases[1].measurement_conditions.dropped_sample_count > 0
+    noisy_case = assessment.cases[3]
+    assert noisy_case.measurement_conditions.noise_seed == 20261030
+    assert noisy_case.measurement_conditions.orientation_noise_sigma_rad == 0.0015
+    assert noisy_case.measurement_conditions.rate_noise_sigma_rad_s == 0.012
+    assert noisy_case.outcome == "ambiguous_contains_truth"
+    assert noisy_case.truth_class_id in noisy_case.evidence_contender_class_ids
 ####
