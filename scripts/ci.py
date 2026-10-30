@@ -114,6 +114,10 @@ def run_pipeline(fix: bool) -> None:
     ####
 
     _run([sys.executable, "-m", "pytest", "-q"], "Tests")
+    _run(
+        [sys.executable, str(ROOT / "scripts" / "check_contract_compatibility.py")],
+        "Alpha public-contract compatibility",
+    )
 ####
 
 

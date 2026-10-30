@@ -19,6 +19,9 @@ implementation consistency, not recovery accuracy on outside data.
 - Shared model primitives, search contracts, policy configuration, convention
   hypotheses, and report contracts now have separate modules with stable
   `models.py` re-exports.
+- A repeatable alpha-tag audit checks public exports, function signatures,
+  class constructor shapes, enum members, and generated model schemas without
+  tracking schema files.
 - [Performance baselines](PERFORMANCE.md) include 10,001-sample compact and
   48-hypothesis quaternion searches, plus 576-hypothesis Euler searches through
   10,001 samples with isolated-process peak memory and cold-call timing.
@@ -42,7 +45,5 @@ implementation consistency, not recovery accuracy on outside data.
 1. Repeat broad Euler timing and memory measurements across supported Python,
    NumPy, and SciPy versions, including representative nonanalytic workloads.
    Avoid promising long-log support until repeated measurements justify it.
-2. Compare public imports and serialized configuration/report contracts against
-   the alpha tag so the module moves do not silently change the library surface.
-3. Confirm the release matrix passes on GitHub, then test an actual `0.0.1`
+2. Confirm the release matrix passes on GitHub, then test an actual `0.0.1`
    prerelease artifact on TestPyPI before a public package release.

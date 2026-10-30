@@ -18,6 +18,14 @@ It uses a temporary directory and does not leave release files in `dist/`.
 For an offline local check with build dependencies already installed, use
 `python scripts/check_distribution.py --no-isolation --skip-twine`.
 
+`scripts/ci.py` also compares public exports, function signatures, class
+constructor shapes, enum members, and generated model schemas against the local
+`0.0.1.a0` tag. It imports the tag
+in a temporary directory, so no generated schemas are tracked. A clone running
+the complete checks needs that tag; the GitHub checkout fetches tags and history.
+An intentional contract change needs explicit compatibility review before
+changing this gate.
+
 To save the validated files for a release, use a fresh output directory:
 
 ```bash

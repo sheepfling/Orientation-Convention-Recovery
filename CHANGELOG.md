@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a repeatable alpha-tag public-contract audit to the one-command CI
+  pipeline without tracking generated schemas.
 - Split inference policy selection, evidence sufficiency, dimension assessments,
   diagnostics, and report assembly into focused modules.
 - Separated policy configuration, convention hypotheses, and report contracts

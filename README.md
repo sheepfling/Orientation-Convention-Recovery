@@ -587,7 +587,8 @@ python scripts/ci.py
 
 Use `python scripts/ci.py --fix` to apply the autofixes before running the same
 checks. The runner handles mdrepo, rumdl, generated schemas and examples, Ruff,
-Pyright, scope markers, and tests in the CI order.
+Pyright, scope markers, tests, and an alpha-tag public-contract audit in the CI
+order. A complete clone needs the `0.0.1.a0` tag for that final audit.
 
 The reproducible adversarial harness can be run with:
 
