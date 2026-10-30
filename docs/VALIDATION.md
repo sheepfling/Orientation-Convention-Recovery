@@ -41,6 +41,32 @@ diagnostic abstention signal; the API still returns an operational class. These
 paired synthetic trials are not accuracy estimates for real loggers or independent
 recording sessions.
 
+## Observed synthetic snapshot
+
+On 2026-10-30, commit `3e9173c` was evaluated with 30 paired seeds for each of four
+motion profiles and three noise levels (360 noisy cases total). Each trajectory had
+161 samples at 25 ms spacing. All 360 true classes remained in the evidence contender
+set, but 171 operational classes differed from truth; 280 cases were evidence-
+insufficient, all 360 confidence labels were indeterminate, and no incorrect result
+was labeled evidence-sufficient. The table gives operational misses / evidence-
+insufficient cases; both counts are out of 30 per cell.
+
+| Motion profile | Low noise | Moderate noise | High noise |
+|---|---:|---:|---:|
+| Low excitation | 11 / 30 | 16 / 30 | 24 / 30 |
+| Near gimbal | 2 / 30 | 14 / 30 | 23 / 30 |
+| Rich three-axis | 0 / 0 | 0 / 0 | 0 / 10 |
+| Single axis | 27 / 30 | 27 / 30 | 27 / 30 |
+
+Noise levels are orientation/rate standard deviations of `(0.0015 rad, 0.012 rad/s)`,
+`(0.003 rad, 0.025 rad/s)`, and `(0.006 rad, 0.05 rad/s)`, respectively. The run
+used Python 3.14.6, NumPy 2.5.2, SciPy 1.18.0, and package version
+`0.0.1a0.post1.dev16+g3e9173cb8`. This is a reproducible point-in-time synthetic
+diagnostic, not a real-world success rate, confidence calibration, or release gate.
+It demonstrates that an operational class can be wrong even while truth remains a
+plausible contender; consumers should inspect evidence sufficiency, confidence, and
+the contender set rather than treating the operational class as confirmed.
+
 ```bash
 python scripts/generate_validation_corpus.py
 python scripts/validate_corpus.py .validation-corpus/manifest.json \
