@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 from numpy import arange, array, cos, cross, cumsum, float64, pi, sin, sqrt, stack, zeros
-from numpy.random import Generator, default_rng
+from numpy.random import Generator, SeedSequence, default_rng
 from numpy.typing import NDArray
 
 FloatArray = NDArray[float64]
@@ -52,6 +52,7 @@ NOISE_PROFILES: tuple[NoiseProfile, ...] = (
     NoiseProfile("moderate", 0.003, 0.025),
     NoiseProfile("high", 0.006, 0.05),
 )
+NOISE_SAMPLE_PERIOD_S = 0.025
 
 
 def _axis_quaternion(axis: int, angles: FloatArray) -> FloatArray:
@@ -173,6 +174,7 @@ def generate_corpus(
     *,
     noise_profiles: tuple[NoiseProfile, ...] = (NOISE_PROFILES[0],),
     noise_replicates: int = 1,
+    noise_sample_counts: tuple[int, ...] = (161,),
     motion_profiles: tuple[MotionProfile, ...] = (MotionProfile.RICH_THREE_AXIS,),
 ) -> Path:
     """Write analytic convention cases across optional noise and motion profiles."""
@@ -185,6 +187,12 @@ def generate_corpus(
     ####
     if noise_replicates < 1:
         raise ValueError("noise_replicates must be positive.")
+    ####
+    if not noise_sample_counts or any(count < 21 for count in noise_sample_counts):
+        raise ValueError("Each noise sample count must be at least 21.")
+    ####
+    if len(noise_sample_counts) != len(set(noise_sample_counts)):
+        raise ValueError("noise_sample_counts must be unique.")
     ####
     outdir.mkdir(parents=True, exist_ok=False)
     regular = analytic_motion(arange(101, dtype=float64) * 0.025)
@@ -217,57 +225,63 @@ def generate_corpus(
     )
 
     noisy_cases: list[dict[str, object]] = []
-    noise_times = arange(161, dtype=float64) * 0.025
     for motion_profile in motion_profiles:
-        for profile in noise_profiles:
-            for replicate_index in range(noise_replicates):
-                noise_seed = 20261030 + replicate_index
-                noise_random = default_rng(noise_seed)
-                noisy = analytic_motion(noise_times, motion_profile)
-                noisy_quaternions = _noisy_quaternions(
-                    noisy.quaternion_xyzw,
-                    sigma_rad=profile.orientation_sigma_rad,
-                    random=noise_random,
-                )
-                noisy_rates = noisy.body_rates_rad_s + noise_random.normal(
-                    0.0, profile.rate_sigma_rad_s, noisy.body_rates_rad_s.shape
-                )
-                case_id = (
-                    f"analytic-noisy-{motion_profile.value}-{profile.name}-"
-                    f"{replicate_index + 1:03d}"
-                )
-                csv_name = (
-                    f"quaternion_noisy_{motion_profile.value}_{profile.name}_"
-                    f"{replicate_index + 1:03d}.csv"
-                )
-                _write_csv(outdir / csv_name, noisy, noisy_quaternions, noisy_rates)
-                noisy_cases.append(
-                    {
-                        "case_id": case_id,
-                        "csv": csv_name,
-                        "label_source": (
-                            "analytic ZYX generator with seeded measurement noise: "
-                            "scripts/generate_validation_corpus.py"
-                        ),
-                        "measurement_conditions": {
-                            "motion_profile_id": motion_profile.value,
-                            "orientation_noise_sigma_rad": profile.orientation_sigma_rad,
-                            "rate_noise_sigma_rad_s": profile.rate_sigma_rad_s,
-                            "noise_seed": noise_seed,
-                        },
-                        "representation": "quaternion",
-                        "orientation_columns": ["a0", "a1", "a2", "a3"],
-                        "rate_columns": ["r0", "r1", "r2"],
-                        "time_column": "time_s",
-                        "truth": {
-                            "attitude_direction": "body_to_world",
-                            "quaternion_order": "scalar_last",
-                            "rate_frame": "body",
-                            "rate_order": "pqr",
-                            "rate_unit": "radians_per_second",
-                        },
-                    }
-                )
+        for sample_count in noise_sample_counts:
+            noise_times = arange(sample_count, dtype=float64) * NOISE_SAMPLE_PERIOD_S
+            for profile in noise_profiles:
+                for replicate_index in range(noise_replicates):
+                    noise_seed = 20261030 + replicate_index
+                    orientation_seed, rate_seed = SeedSequence(noise_seed).spawn(2)
+                    orientation_random = default_rng(orientation_seed)
+                    rate_random = default_rng(rate_seed)
+                    noisy = analytic_motion(noise_times, motion_profile)
+                    noisy_quaternions = _noisy_quaternions(
+                        noisy.quaternion_xyzw,
+                        sigma_rad=profile.orientation_sigma_rad,
+                        random=orientation_random,
+                    )
+                    noisy_rates = noisy.body_rates_rad_s + rate_random.normal(
+                        0.0, profile.rate_sigma_rad_s, noisy.body_rates_rad_s.shape
+                    )
+                    case_id = (
+                        f"analytic-noisy-{motion_profile.value}-{profile.name}-"
+                        f"n{sample_count}-{replicate_index + 1:03d}"
+                    )
+                    csv_name = (
+                        f"quaternion_noisy_{motion_profile.value}_{profile.name}_"
+                        f"n{sample_count}_{replicate_index + 1:03d}.csv"
+                    )
+                    _write_csv(outdir / csv_name, noisy, noisy_quaternions, noisy_rates)
+                    noisy_cases.append(
+                        {
+                            "case_id": case_id,
+                            "csv": csv_name,
+                            "label_source": (
+                                "analytic ZYX generator with seeded measurement noise: "
+                                "scripts/generate_validation_corpus.py"
+                            ),
+                            "measurement_conditions": {
+                                "motion_profile_id": motion_profile.value,
+                                "orientation_noise_sigma_rad": profile.orientation_sigma_rad,
+                                "rate_noise_sigma_rad_s": profile.rate_sigma_rad_s,
+                                "noise_seed": noise_seed,
+                                "sample_count": sample_count,
+                                "sample_period_s": NOISE_SAMPLE_PERIOD_S,
+                            },
+                            "representation": "quaternion",
+                            "orientation_columns": ["a0", "a1", "a2", "a3"],
+                            "rate_columns": ["r0", "r1", "r2"],
+                            "time_column": "time_s",
+                            "truth": {
+                                "attitude_direction": "body_to_world",
+                                "quaternion_order": "scalar_last",
+                                "rate_frame": "body",
+                                "rate_order": "pqr",
+                                "rate_unit": "radians_per_second",
+                            },
+                        }
+                    )
+                ####
             ####
         ####
     ####
@@ -372,6 +386,14 @@ def main() -> None:
         help="seeded realizations per noise profile",
     )
     parser.add_argument(
+        "--noise-sample-counts",
+        type=int,
+        nargs="+",
+        default=(161,),
+        metavar="N",
+        help="sample counts for noisy cases; seed-paired across these durations",
+    )
+    parser.add_argument(
         "--motion-profile",
         choices=(*tuple(profile.value for profile in MotionProfile), "all"),
         default=MotionProfile.RICH_THREE_AXIS.value,
@@ -393,6 +415,7 @@ def main() -> None:
             args.outdir,
             noise_profiles=profiles,
             noise_replicates=args.noise_replicates,
+            noise_sample_counts=tuple(args.noise_sample_counts),
             motion_profiles=motion_profiles,
         )
     )

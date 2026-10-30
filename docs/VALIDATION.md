@@ -24,11 +24,15 @@ For a paired noise sensitivity study, the generator offers low, moderate, and hi
 per-axis standard deviations: orientation/rate `(0.0015 rad, 0.012 rad/s)`,
 `(0.003 rad, 0.025 rad/s)`, and `(0.006 rad, 0.05 rad/s)`. It uses the same seed
 set across all levels and motion profiles; increase `--noise-replicates` for a
-larger study:
+larger study. `--noise-sample-counts 161 401` compares 4-second and 10-second
+recordings at 25 ms spacing. Independent seeded streams for orientation and rate
+noise keep each shorter trial an exact prefix of its longer paired trial, and the
+assessment groups results by sample count and period.
 
 ```bash
 python scripts/generate_validation_corpus.py \
-  --noise-profile all --motion-profile all --noise-replicates 10
+  --noise-profile all --motion-profile all --noise-replicates 30 \
+  --noise-sample-counts 161 401
 python scripts/validate_corpus.py .validation-corpus/manifest.json
 ```
 
@@ -36,10 +40,14 @@ The motion profiles are rich three-axis, low-excitation, single-axis, and near-g
 trajectories. The assessment groups replicates by representation, motion profile,
 and measurement conditions; it reports evidence, data-winner, and operational miss
 rates, plus indeterminate-confidence and evidence-insufficiency rates. It also
-records Python/platform/NumPy/SciPy/package versions. Evidence insufficiency is a
-diagnostic abstention signal; the API still returns an operational class. These
+records Python/platform/NumPy/SciPy/package versions. The typed `report.decision`
+recommends a class only when evidence is sufficient and one data-only contender remains;
+otherwise it abstains with a reason. The report still preserves its deterministic
+`operational_class_id` as a best candidate for diagnostics, not as confirmation. These
 paired synthetic trials are not accuracy estimates for real loggers or independent
-recording sessions.
+recording sessions. The assessment records each decision and reports recommendation
+coverage, accuracy among recommendations, and wrong-recommendation counts separately
+from the always-present operational class metrics.
 
 ## Observed synthetic snapshot
 

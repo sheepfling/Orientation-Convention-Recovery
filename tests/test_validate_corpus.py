@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from attitude_convention_inference import InferenceDecisionStatus
 from scripts.generate_validation_corpus import MotionProfile, generate_corpus
 from scripts.validate_corpus import MeasurementConditions, main, validate_corpus
 
@@ -63,6 +64,10 @@ def test_validation_corpus_counts_recovery_and_missed_label(tmp_path: Path) -> N
     assert result.summary.data_winner_miss == 1
     assert result.summary.operational_miss == 1
     assert result.summary.incorrect_evidence_sufficient == 1
+    assert result.summary.recommendation_count == 2
+    assert result.summary.abstention_count == 0
+    assert result.summary.recommendation_miss == 1
+    assert result.summary.recommendation_coverage == result.summary.recommendation_count / 2
     assert result.cases[0].truth_class_id in result.cases[0].evidence_contender_class_ids
     assert result.cases[1].truth_class_id not in result.cases[1].evidence_contender_class_ids
     assert result.cases[0].operational_correct
@@ -71,6 +76,8 @@ def test_validation_corpus_counts_recovery_and_missed_label(tmp_path: Path) -> N
     assert result.condition_summaries[0].operational_miss == 1
     assert result.condition_summaries[0].evidence_miss_rate == 0.5
     assert result.condition_summaries[0].incorrect_evidence_sufficient_rate == 0.5
+    assert result.condition_summaries[0].recommendation_accuracy == 0.5
+    assert result.cases[1].recommendation_correct is False
 ####
 
 
@@ -93,6 +100,9 @@ def test_validation_corpus_rejects_duplicate_case_ids(tmp_path: Path) -> None:
         {"orientation_noise_sigma_rad": float("nan")},
         {"rate_noise_sigma_rad_s": float("inf")},
         {"noise_seed": -1},
+        {"sample_count": 161},
+        {"sample_period_s": 0.025},
+        {"sample_count": 0, "sample_period_s": 0.025},
         {"unrecognized_condition": True},
     ),
 )
@@ -121,6 +131,18 @@ def test_fail_on_miss_includes_wrong_operational_class(
 
     assert assessment.summary.evidence_miss == 0
     assert assessment.summary.operational_miss > 0
+    operational_misses = [case for case in assessment.cases if not case.operational_correct]
+    assert all(
+        case.decision.status is InferenceDecisionStatus.ABSTENTION for case in operational_misses
+    )
+    assert assessment.summary.recommendation_miss == 0
+    single_axis_condition = next(
+        summary
+        for summary in assessment.condition_summaries
+        if summary.measurement_conditions.motion_profile_id == MotionProfile.SINGLE_AXIS.value
+    )
+    assert single_axis_condition.recommendation_coverage == 0.0
+    assert single_axis_condition.recommendation_accuracy is None
     with pytest.raises(SystemExit) as exit_info:
         main()
     ####

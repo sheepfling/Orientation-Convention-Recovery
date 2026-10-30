@@ -6,16 +6,18 @@ import argparse
 import platform
 import sys
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, Self, cast
 
 from numpy import __version__ as numpy_version
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 from scipy import __version__ as scipy_version
 
 from attitude_convention_inference import (
     AttitudeRepresentation,
     ConventionHypothesis,
     InferenceConfig,
+    InferenceDecision,
+    InferenceDecisionStatus,
     __version__,
     infer_csv,
 )
@@ -32,6 +34,25 @@ class MeasurementConditions(BaseModel):
     orientation_noise_sigma_rad: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     rate_noise_sigma_rad_s: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     noise_seed: int | None = Field(default=None, ge=0)
+    sample_count: int | None = Field(default=None, gt=0)
+    sample_period_s: float | None = Field(default=None, gt=0.0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _validate_sampling_pair(self) -> Self:
+        if (self.sample_count is None) != (self.sample_period_s is None):
+            raise ValueError("sample_count and sample_period_s must be provided together")
+        ####
+        return self
+    ####
+
+    @computed_field
+    @property
+    def duration_s(self) -> float | None:
+        if self.sample_count is None or self.sample_period_s is None:
+            return None
+        ####
+        return (self.sample_count - 1) * self.sample_period_s
+    ####
 ####
 
 
@@ -111,6 +132,8 @@ class CaseAssessment(BaseModel):
     data_winner_correct: bool
     operational_class_id: str
     operational_correct: bool
+    decision: InferenceDecision
+    recommendation_correct: bool | None
     outcome: Literal["resolved_correct", "ambiguous_contains_truth", "evidence_miss"]
     confidence_label: str
     evidence_sufficient: bool
@@ -128,6 +151,24 @@ class ValidationSummary(BaseModel):
     operational_miss: int
     evidence_insufficient: int
     incorrect_evidence_sufficient: int
+    recommendation_count: int
+    abstention_count: int
+    recommendation_miss: int
+
+    @computed_field
+    @property
+    def recommendation_coverage(self) -> float:
+        return self.recommendation_count / self.case_count
+    ####
+
+    @computed_field
+    @property
+    def recommendation_accuracy(self) -> float | None:
+        if self.recommendation_count == 0:
+            return None
+        ####
+        return (self.recommendation_count - self.recommendation_miss) / self.recommendation_count
+    ####
 ####
 
 
@@ -147,6 +188,24 @@ class ConditionSummary(BaseModel):
     evidence_insufficient: int
     incorrect_evidence_sufficient: int
     indeterminate_confidence: int
+    recommendation_count: int
+    abstention_count: int
+    recommendation_miss: int
+
+    @computed_field
+    @property
+    def recommendation_coverage(self) -> float:
+        return self.recommendation_count / self.case_count
+    ####
+
+    @computed_field
+    @property
+    def recommendation_accuracy(self) -> float | None:
+        if self.recommendation_count == 0:
+            return None
+        ####
+        return (self.recommendation_count - self.recommendation_miss) / self.recommendation_count
+    ####
 
     @computed_field
     @property
@@ -195,6 +254,12 @@ class ConditionSummary(BaseModel):
     def indeterminate_confidence_rate(self) -> float:
         return self.indeterminate_confidence / self.case_count
     ####
+
+    @computed_field
+    @property
+    def recommendation_miss_rate(self) -> float:
+        return self.recommendation_miss / self.case_count
+    ####
 ####
 
 
@@ -211,7 +276,16 @@ class CorpusAssessment(BaseModel):
 
 def _condition_summaries(assessments: list[CaseAssessment]) -> tuple[ConditionSummary, ...]:
     groups: dict[
-        tuple[AttitudeRepresentation, str | None, float, int, float, float],
+        tuple[
+            AttitudeRepresentation,
+            str | None,
+            float,
+            int,
+            float,
+            float,
+            int | None,
+            float | None,
+        ],
         list[CaseAssessment],
     ] = {}
     for assessment in assessments:
@@ -223,6 +297,8 @@ def _condition_summaries(assessments: list[CaseAssessment]) -> tuple[ConditionSu
             conditions.dropped_sample_count,
             conditions.orientation_noise_sigma_rad,
             conditions.rate_noise_sigma_rad_s,
+            conditions.sample_count,
+            conditions.sample_period_s,
         )
         groups.setdefault(key, []).append(assessment)
     ####
@@ -236,6 +312,8 @@ def _condition_summaries(assessments: list[CaseAssessment]) -> tuple[ConditionSu
             item[0][3],
             item[0][4],
             item[0][5],
+            item[0][6] or 0,
+            item[0][7] or 0.0,
         ),
     ):
         representative = cases[0]
@@ -260,6 +338,13 @@ def _condition_summaries(assessments: list[CaseAssessment]) -> tuple[ConditionSu
                 indeterminate_confidence=sum(
                     item.confidence_label == "indeterminate" for item in cases
                 ),
+                recommendation_count=sum(
+                    item.decision.status is InferenceDecisionStatus.RECOMMENDATION for item in cases
+                ),
+                abstention_count=sum(
+                    item.decision.status is InferenceDecisionStatus.ABSTENTION for item in cases
+                ),
+                recommendation_miss=sum(item.recommendation_correct is False for item in cases),
             )
         )
     ####
@@ -302,6 +387,7 @@ def validate_corpus(manifest_path: Path) -> CorpusAssessment:
         ####
         truth_class_id = truth_candidates[0].equivalence_class_id
         contenders = report.evidence_contender_class_ids
+        decision = report.decision
         if truth_class_id not in contenders:
             outcome: Literal["resolved_correct", "ambiguous_contains_truth", "evidence_miss"] = (
                 "evidence_miss"
@@ -325,6 +411,12 @@ def validate_corpus(manifest_path: Path) -> CorpusAssessment:
                 data_winner_correct=truth_class_id in report.data_winning_class_ids,
                 operational_class_id=report.operational_class_id,
                 operational_correct=truth_class_id == report.operational_class_id,
+                decision=decision,
+                recommendation_correct=(
+                    None
+                    if decision.recommended_class_id is None
+                    else truth_class_id == decision.recommended_class_id
+                ),
                 outcome=outcome,
                 confidence_label=report.diagnostics.confidence_label.value,
                 evidence_sufficient=report.diagnostics.evidence_sufficient,
@@ -353,6 +445,14 @@ def validate_corpus(manifest_path: Path) -> CorpusAssessment:
             incorrect_evidence_sufficient=sum(
                 item.outcome == "evidence_miss" and item.evidence_sufficient for item in assessments
             ),
+            recommendation_count=sum(
+                item.decision.status is InferenceDecisionStatus.RECOMMENDATION
+                for item in assessments
+            ),
+            abstention_count=sum(
+                item.decision.status is InferenceDecisionStatus.ABSTENTION for item in assessments
+            ),
+            recommendation_miss=sum(item.recommendation_correct is False for item in assessments),
         ),
         cases=tuple(assessments),
         condition_summaries=_condition_summaries(assessments),

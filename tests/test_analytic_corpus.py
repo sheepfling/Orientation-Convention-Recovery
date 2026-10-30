@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, cast
 
@@ -56,6 +57,9 @@ def test_generated_analytic_corpus_reports_noisy_ambiguity_reproducibly(tmp_path
     assert assessment.cases[1].measurement_conditions.dropped_sample_count > 0
     noisy_case = assessment.cases[3]
     assert noisy_case.measurement_conditions.noise_seed == 20261030
+    assert noisy_case.measurement_conditions.sample_count == 161
+    assert noisy_case.measurement_conditions.sample_period_s == 0.025
+    assert noisy_case.measurement_conditions.duration_s == pytest.approx(4.0)
     assert noisy_case.measurement_conditions.orientation_noise_sigma_rad == 0.0015
     assert noisy_case.measurement_conditions.rate_noise_sigma_rad_s == 0.012
     assert noisy_case.outcome == "ambiguous_contains_truth"
@@ -103,4 +107,44 @@ def test_noise_replicates_are_aggregated_by_measurement_condition(tmp_path: Path
     assert all(
         summary.evidence_miss_rate == summary.evidence_miss / 2 for summary in low_noise_summaries
     )
+####
+
+
+def test_paired_noise_replicates_cover_multiple_recording_durations(tmp_path: Path) -> None:
+    manifest = generate_corpus(
+        tmp_path / "duration-corpus",
+        noise_profiles=(NOISE_PROFILES[0],),
+        noise_replicates=2,
+        noise_sample_counts=(161, 401),
+        motion_profiles=(MotionProfile.RICH_THREE_AXIS,),
+    )
+
+    assessment = validate_corpus(manifest)
+    duration_summaries = tuple(
+        summary
+        for summary in assessment.condition_summaries
+        if summary.measurement_conditions.orientation_noise_sigma_rad == 0.0015
+    )
+    assert len(duration_summaries) == 2
+    assert {summary.measurement_conditions.sample_count for summary in duration_summaries} == {
+        161,
+        401,
+    }
+    assert {summary.measurement_conditions.duration_s for summary in duration_summaries} == {
+        4.0,
+        10.0,
+    }
+    assert all(summary.case_count == 2 for summary in duration_summaries)
+
+    manifest_payload: Any = json.loads(manifest.read_text(encoding="utf-8"))
+    noisy_csv_by_count = {
+        case["measurement_conditions"]["sample_count"]: case["csv"]
+        for case in manifest_payload["cases"]
+        if case["measurement_conditions"].get("noise_seed") == 20261030
+    }
+    short_path = manifest.parent / noisy_csv_by_count[161]
+    long_path = manifest.parent / noisy_csv_by_count[401]
+    short_lines = short_path.read_text(encoding="utf-8").splitlines()
+    long_lines = long_path.read_text(encoding="utf-8").splitlines()
+    assert short_lines == long_lines[: len(short_lines)]
 ####

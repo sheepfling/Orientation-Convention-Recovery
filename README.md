@@ -567,6 +567,26 @@ dependence assumptions, priors, and model calibration. Noticeable residual corre
 is reported as a warning because the i.i.d. approximation can make evidence accumulate
 too quickly.
 
+For an explicit result that can abstain, inspect `report.decision`. It recommends a
+class only when the evidence threshold is met and exactly one data-only contender
+remains; soft priors cannot turn an ambiguous evidence set into a recommendation. The
+status and reason are typed as `InferenceDecisionStatus` and `InferenceDecisionReason`.
+The existing `operational_class_id` remains a deterministic best candidate for ranking
+and diagnostics, not a guarantee that the convention is established.
+
+```python
+from attitude_convention_inference import InferenceDecisionStatus
+
+if report.decision.status is InferenceDecisionStatus.RECOMMENDATION:
+    class_id = report.decision.recommended_class_id
+else:
+    print(f"Inference abstained: {report.decision.reason.value}")
+```
+
+The computed `report.decision` view does not alter the versioned `InferenceReport` JSON
+schema. Use `--format decision-json` for a standalone JSON decision; the ordinary
+`--format json` continues to emit the complete report and its underlying evidence fields.
+
 ## Dependencies
 
 Runtime dependencies are intentionally limited to:

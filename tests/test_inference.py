@@ -9,6 +9,8 @@ from attitude_convention_inference import (
     AttitudeRepresentation,
     EulerMode,
     InferenceConfig,
+    InferenceDecisionReason,
+    InferenceDecisionStatus,
     QuaternionOrder,
     RateFrame,
     RateUnit,
@@ -48,6 +50,11 @@ def test_recovers_scalar_first_world_to_body_world_rates_and_rqp_order() -> None
     assert best.rate_order == truth.rate_order
     assert report.best.interval_rmse_rad < 1.0e-7
     assert report.diagnostics.confidence > 0.70
+    assert report.decision.status is InferenceDecisionStatus.RECOMMENDATION
+    assert report.decision.reason is InferenceDecisionReason.UNIQUE_SUFFICIENT_EVIDENCE
+    assert report.decision.recommended_class_id == report.evidence_contender_class_ids[0]
+    assert "decision" not in report.model_dump()
+    assert "decision" not in report.model_json_schema()["properties"]
 ####
 
 

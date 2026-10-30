@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .decision import InferenceDecision, InferenceDecisionReason, InferenceDecisionStatus
 from .hypothesis_model import ConventionHypothesis
 from .model_common import (
     AngleUnit,
@@ -48,6 +49,9 @@ __all__ = [
     "HeuristicFeatures",
     "HypothesisSpaceSummary",
     "InferenceConfig",
+    "InferenceDecision",
+    "InferenceDecisionReason",
+    "InferenceDecisionStatus",
     "InferenceReport",
     "LagMetric",
     "OverallDiagnostics",

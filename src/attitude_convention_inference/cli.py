@@ -23,6 +23,7 @@ from .models import (
     AttitudeRepresentation,
     ConventionConstraints,
     EulerMode,
+    InferenceDecision,
     PreferenceProfile,
     QuaternionOrder,
     RateFrame,
@@ -180,9 +181,9 @@ def _parser() -> argparse.ArgumentParser:
         "--format",
         "--output-format",
         dest="output_format",
-        choices=("text", "json"),
+        choices=("text", "json", "decision-json"),
         default="text",
-        help="Human-readable summary or complete JSON report on standard output.",
+        help="Text summary, complete JSON report, or evidence-gated decision JSON.",
     )
     parser.add_argument(
         "--inspect",
@@ -243,7 +244,7 @@ def _print_profile_catalog(profiles: Sequence[PreferenceProfile]) -> None:
 ####
 
 
-def _print_report(report_json: str, top: int) -> None:
+def _print_report(report_json: str, top: int, decision: InferenceDecision) -> None:
     payload = json.loads(report_json)
     best = payload["best"]
     diagnostics = payload["diagnostics"]
@@ -258,6 +259,10 @@ def _print_report(report_json: str, top: int) -> None:
     print(
         f"operational_class={payload.get('operational_class_id', '')}  "
         f"operational_hypothesis={payload.get('operational_hypothesis_id', '')}"
+    )
+    print(
+        f"decision={decision.status.value}  reason={decision.reason.value}  "
+        f"recommended_class={decision.recommended_class_id or '<none>'}"
     )
     print(
         "evidence_contenders="
@@ -371,6 +376,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
 
     try:
+        if arguments.output_format == "decision-json" and (
+            arguments.list_profiles or arguments.inspect_profile is not None or arguments.inspect
+        ):
+            raise ValueError("--format decision-json is available only for trajectory inference.")
+        ####
         if arguments.list_profiles and arguments.inspect_profile is not None:
             raise ValueError("--list-profiles and --inspect-profile are mutually exclusive.")
         ####
@@ -468,11 +478,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = infer_conventions(data, config)
         report_json = report.model_dump_json(indent=2)
 
-        if arguments.output_format == "json":
+        if arguments.output_format == "decision-json":
+            print(report.decision.model_dump_json(indent=2))
+        elif arguments.output_format == "json":
             print(report_json)
         else:
             _print_layout(layout)
-            _print_report(report_json, arguments.top)
+            _print_report(report_json, arguments.top, report.decision)
         ####
 
         if arguments.report_json:

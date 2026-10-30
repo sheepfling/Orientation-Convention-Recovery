@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic.dataclasses import dataclass
 
+from .decision import InferenceDecision
 from .hypothesis_model import ConventionHypothesis
 from .immutable import ReadOnlyMapping, freeze_mapping, freeze_nested_mapping
 from .model_common import (
@@ -249,4 +250,14 @@ class InferenceReport(FrozenModel):
     preference_profile_abstained: bool = False
     preference_profile_supported_class_ids: tuple[str, ...] = ()
     representative_selection_reason: str = "canonical-policy"
+
+    @property
+    def decision(self) -> InferenceDecision:
+        """Return a data-evidence recommendation without changing the report schema."""
+
+        return InferenceDecision.from_evidence(
+            evidence_sufficient=self.diagnostics.evidence_sufficient,
+            evidence_contender_class_ids=self.evidence_contender_class_ids,
+        )
+    ####
 ####

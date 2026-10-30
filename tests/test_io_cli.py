@@ -133,7 +133,10 @@ def test_write_interval_diagnostics(tmp_path: Path) -> None:
 ####
 
 
-def test_cli_writes_report_and_details(tmp_path: Path) -> None:
+def test_cli_writes_report_and_details(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     source = tmp_path / "trajectory.csv"
     rows: list[dict[str, object]] = []
     for index in range(21):
@@ -164,38 +167,44 @@ def test_cli_writes_report_and_details(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     details_path = tmp_path / "details.csv"
 
-    exit_code = main(
-        [
-            str(source),
-            "--representation",
-            "quaternion",
-            "--orientation-columns",
-            "qx",
-            "qy",
-            "qz",
-            "qw",
-            "--rate-columns",
-            "p",
-            "q",
-            "r",
-            "--time-column",
-            "time",
-            "--config",
-            str(config_path),
-            "--report-json",
-            str(report_path),
-            "--details-csv",
-            str(details_path),
-            "--top",
-            "2",
-        ]
-    )
+    arguments = [
+        str(source),
+        "--representation",
+        "quaternion",
+        "--orientation-columns",
+        "qx",
+        "qy",
+        "qz",
+        "qw",
+        "--rate-columns",
+        "p",
+        "q",
+        "r",
+        "--time-column",
+        "time",
+        "--config",
+        str(config_path),
+        "--report-json",
+        str(report_path),
+        "--details-csv",
+        str(details_path),
+        "--top",
+        "2",
+    ]
+    exit_code = main(arguments)
 
     assert exit_code == 0
+    assert "decision=" in capsys.readouterr().out
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["sample_count"] == 21
     assert payload["best"]["interval_rmse_rad"] < 1.0e-6
     assert len(list(csv.DictReader(details_path.open(encoding="utf-8")))) == 20
+
+    decision_exit_code = main([*arguments, "--format", "decision-json"])
+    decision_payload = json.loads(capsys.readouterr().out)
+    assert decision_exit_code == 0
+    assert decision_payload["status"] in ("recommendation", "abstention")
+    assert "reason" in decision_payload
 ####
 
 
