@@ -9,6 +9,7 @@ import pytest
 from numpy.random import default_rng
 
 from attitude_convention_inference.math_utils import rotation_from_quat, rotation_rotvecs
+from attitude_convention_inference.statistics import estimate_noise_process
 from scripts.generate_validation_corpus import (
     NOISE_PROFILES,
     MotionProfile,
@@ -96,6 +97,23 @@ def test_ar1_noise_has_configured_lag_one_correlation(coefficient: float) -> Non
     assert float(np.corrcoef(samples[:-1, 0], samples[1:, 0])[0, 1]) == pytest.approx(
         coefficient, abs=0.02
     )
+####
+
+
+def test_interval_difference_autocorrelation_is_not_measurement_ar1_coefficient() -> None:
+    measurement_noise = correlated_gaussian_noise(
+        default_rng(902),
+        sigma=0.7,
+        sample_count=20_000,
+        dimension_count=3,
+        ar1_coefficient=0.8,
+    )
+
+    interval_errors = np.diff(measurement_noise, axis=0)
+    estimate = estimate_noise_process(interval_errors, trim_fraction=0.02)
+
+    assert estimate.lag1_autocorrelation == pytest.approx(-0.1, abs=0.02)
+    assert estimate.lag1_autocorrelation != pytest.approx(0.8, abs=0.1)
 ####
 
 

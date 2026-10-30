@@ -68,7 +68,7 @@ class RawExcitationSummary:
 
 @dataclass(frozen=True, slots=True)
 class NoiseProcessEstimate:
-    """Robust residual scale and temporal-correlation estimates."""
+    """Robust residual scale and lag-one correlation of interval error vectors."""
 
     sigma_rad: float
     retained_count: int

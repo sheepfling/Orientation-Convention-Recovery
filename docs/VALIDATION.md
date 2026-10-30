@@ -76,7 +76,10 @@ The motion profiles are rich three-axis, low-excitation, single-axis, and near-g
 trajectories. The assessment groups replicates by representation, motion profile,
 and measurement conditions; it reports evidence, data-winner, and operational miss
 rates, plus indeterminate-confidence and evidence-insufficiency rates. It also
-records Python/platform/NumPy/SciPy/package versions. The typed `report.decision`
+records the per-case noise estimate, residual lag-one autocorrelation, evidence
+prefix/likelihood diagnostics, and inference warnings; condition summaries include
+the mean residual lag-one autocorrelation. Python/platform/NumPy/SciPy/package
+versions are recorded as well. The typed `report.decision`
 recommends a class only when evidence is sufficient and one data-only contender remains;
 otherwise it abstains with a reason. The report still preserves its deterministic
 `operational_class_id` as a best candidate for diagnostics, not as confirmation. These
@@ -258,6 +261,29 @@ The three control cases bring the complete assessment to 44 recommendations
 (including those controls) and 319 abstentions. The run used Python 3.14.6,
 NumPy 2.5.2, SciPy 1.18.0, and inference package version
 `0.0.1a0.post1.dev20+g6400de09c`.
+
+The generator's `rho` values describe raw per-sample measurement perturbations;
+the inference diagnostic estimates lag-one correlation on interval rotation
+residuals, so those numbers are not expected to match. In fact, differencing
+independent orientation errors naturally induces negative adjacent interval
+correlation. In the low-noise cells, the mean measured residual correlation and
+number of cases carrying the correlation warning were:
+
+| Requested `(rho_orientation, rho_rate)` | Mean interval-residual lag-1 | Warning cases |
+|---|---:|---:|
+| `(0, 0)` | -0.476 | 30 / 30 |
+| `(0, 0.8)` | -0.463 | 30 / 30 |
+| `(0.8, 0)` | -0.084 | 0 / 30 |
+| `(0.8, 0.8)` | -0.042 | 0 / 30 |
+
+For an ideal scalar AR(1) orientation perturbation, first differences alone
+have lag-one correlation `-(1-rho)/2` (approximately -0.5 at `rho=0` and -0.1
+at `rho=0.8`). The observed estimates are close to that pattern, with small
+effects from rate noise and the full rotation residual calculation. This makes
+the warning interpretable as a property of interval residuals, not a direct
+sensor-noise-correlation estimate; it also reinforces that the evidence model's
+independence assumption needs a more suitable residual covariance model before
+its likelihood ratio can be treated as calibrated.
 
 The 30-seed acquisition and noise sweeps can be regenerated with:
 

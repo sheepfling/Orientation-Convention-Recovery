@@ -72,7 +72,25 @@ def test_validation_corpus_counts_recovery_and_missed_label(tmp_path: Path) -> N
     assert result.cases[1].truth_class_id not in result.cases[1].evidence_contender_class_ids
     assert result.cases[0].operational_correct
     assert not result.cases[1].operational_correct
+    diagnostics = result.cases[0].inference_diagnostics
+    assert 0.0 <= diagnostics.confidence <= 1.0
+    assert diagnostics.estimated_noise_sigma_rad >= 0.0
+    assert diagnostics.noise_residual_count > 0
+    assert -1.0 <= diagnostics.noise_lag1_autocorrelation <= 1.0
+    assert 0 <= diagnostics.evidence_intervals_used <= result.cases[0].sample_count - 1
+    assert 0.0 <= diagnostics.evidence_fraction <= 1.0
+    serialized_diagnostics = json.loads(result.model_dump_json())["cases"][0][
+        "inference_diagnostics"
+    ]
+    assert (
+        serialized_diagnostics["noise_lag1_autocorrelation"]
+        == diagnostics.noise_lag1_autocorrelation
+    )
+    assert serialized_diagnostics["warnings"] == list(diagnostics.warnings)
     assert result.condition_summaries[0].case_count == 2
+    assert result.condition_summaries[0].mean_noise_lag1_autocorrelation == pytest.approx(
+        sum(case.inference_diagnostics.noise_lag1_autocorrelation for case in result.cases) / 2
+    )
     assert result.condition_summaries[0].operational_miss == 1
     assert result.condition_summaries[0].evidence_miss_rate == 0.5
     assert result.condition_summaries[0].incorrect_evidence_sufficient_rate == 0.5

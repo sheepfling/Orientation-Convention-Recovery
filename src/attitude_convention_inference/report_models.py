@@ -197,6 +197,7 @@ class OverallDiagnostics(FrozenModel):
     noise_model: str = "isotropic_rotation_vector_gaussian"
     estimated_noise_sigma_rad: float = 0.0
     noise_residual_count: int = 0
+    # Estimated from interval residual vectors, not raw sensor samples.
     noise_lag1_autocorrelation: float = 0.0
     evidence_sufficient: bool = False
     evidence_intervals_used: int = 0

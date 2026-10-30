@@ -229,7 +229,7 @@ def _build_overall_diagnostics(
     ####
     if abs(noise_autocorrelation) >= 0.25:
         warnings.append(
-            "Residuals show noticeable lag-one correlation; the iid Gaussian evidence "
+            "Interval residuals show noticeable lag-one correlation; the iid Gaussian evidence "
             "scale should be treated as approximate."
         )
     ####

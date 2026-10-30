@@ -145,6 +145,22 @@ class EvaluationEnvironment(BaseModel):
 ####
 
 
+class InferenceDiagnostics(BaseModel):
+    """Typed inference diagnostics preserved for one evaluated trajectory."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    confidence: float = Field(ge=0.0, le=1.0, allow_inf_nan=False)
+    estimated_noise_sigma_rad: float = Field(ge=0.0, allow_inf_nan=False)
+    noise_residual_count: int = Field(ge=0)
+    noise_lag1_autocorrelation: float = Field(ge=-1.0, le=1.0, allow_inf_nan=False)
+    evidence_intervals_used: int = Field(ge=0)
+    evidence_fraction: float = Field(ge=0.0, le=1.0, allow_inf_nan=False)
+    evidence_log_likelihood_ratio: float = Field(allow_inf_nan=False)
+    warnings: tuple[str, ...]
+####
+
+
 class CaseAssessment(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -165,6 +181,7 @@ class CaseAssessment(BaseModel):
     outcome: Literal["resolved_correct", "ambiguous_contains_truth", "evidence_miss"]
     confidence_label: str
     evidence_sufficient: bool
+    inference_diagnostics: InferenceDiagnostics
 ####
 
 
@@ -222,6 +239,7 @@ class ConditionSummary(BaseModel):
     evidence_insufficient: int
     incorrect_evidence_sufficient: int
     indeterminate_confidence: int
+    mean_noise_lag1_autocorrelation: float
     recommendation_count: int
     abstention_count: int
     recommendation_miss: int
@@ -421,6 +439,10 @@ def _condition_summaries(assessments: list[CaseAssessment]) -> tuple[ConditionSu
                 indeterminate_confidence=sum(
                     item.confidence_label == "indeterminate" for item in cases
                 ),
+                mean_noise_lag1_autocorrelation=sum(
+                    item.inference_diagnostics.noise_lag1_autocorrelation for item in cases
+                )
+                / len(cases),
                 recommendation_count=sum(
                     item.decision.status is InferenceDecisionStatus.RECOMMENDATION for item in cases
                 ),
@@ -511,6 +533,16 @@ def validate_corpus(manifest_path: Path) -> CorpusAssessment:
                 outcome=outcome,
                 confidence_label=report.diagnostics.confidence_label.value,
                 evidence_sufficient=report.diagnostics.evidence_sufficient,
+                inference_diagnostics=InferenceDiagnostics(
+                    confidence=report.diagnostics.confidence,
+                    estimated_noise_sigma_rad=report.diagnostics.estimated_noise_sigma_rad,
+                    noise_residual_count=report.diagnostics.noise_residual_count,
+                    noise_lag1_autocorrelation=report.diagnostics.noise_lag1_autocorrelation,
+                    evidence_intervals_used=report.diagnostics.evidence_intervals_used,
+                    evidence_fraction=report.diagnostics.evidence_fraction,
+                    evidence_log_likelihood_ratio=report.diagnostics.evidence_log_likelihood_ratio,
+                    warnings=report.diagnostics.warnings,
+                ),
             )
         )
     ####
