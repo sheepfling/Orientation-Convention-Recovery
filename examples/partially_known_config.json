@@ -1,0 +1,27 @@
+{
+  "constraints": {
+    "quaternion_order": "scalar_first",
+    "rate_order": [
+      "pqr",
+      "rqp"
+    ]
+  },
+  "priors": {
+    "attitude_direction": {
+      "world_to_body": 3.0,
+      "body_to_world": 1.0
+    },
+    "rate_frame": {
+      "world": 3.0,
+      "body": 1.0
+    }
+  },
+  "integration_substeps": 4,
+  "window_sizes": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "top_k": 20
+}

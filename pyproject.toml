@@ -1,0 +1,103 @@
+[build-system]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "attitude-convention-inference"
+dynamic = ["version"]
+description = "Infer unknown Euler, quaternion, and angular-rate conventions from trajectory consistency."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ninja Rick" }]
+keywords = [
+    "attitude",
+    "euler-angles",
+    "quaternion",
+    "rotations",
+    "trajectory",
+    "angular-velocity",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+dependencies = [
+    "numpy>=1.26.4",
+    "pydantic>=2.7",
+    "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mdrepo>=0.0.1.post0",
+    "psutil>=7.0",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "rumdl>=0.2.44",
+    "ruff>=0.9",
+    "pyright>=1.1.390",
+    "scope-markers==0.0.1a0",
+    "types-psutil>=7.0",
+]
+publish = [
+    "build>=1.2",
+    "setuptools>=77",
+    "setuptools-scm>=8",
+    "twine>=6.0",
+]
+
+[project.scripts]
+attitude-conventions = "attitude_convention_inference.cli:main"
+attitude-convention-inference = "attitude_convention_inference.cli:main"
+attitude-cohort-fusion = "attitude_convention_inference.fusion:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+attitude_convention_inference = ["py.typed", "data/profiles/*.json"]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.1"
+version_file = "src/attitude_convention_inference/_version.py"
+version_scheme = "no-guess-dev"
+
+[tool.pytest.ini_options]
+addopts = "-ra -p no:cacheprovider"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.rumdl]
+include = ["README.md", "PUBLISHING.md", "CHANGELOG.md", "docs/**/*.md", "paper/**/*.md"]
+respect-gitignore = true
+line-length = 100
+
+[tool.pyright]
+# Analyze against the stable NumPy typing surface; runtime compatibility is tested
+# separately on every supported interpreter in the CI matrix.
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+include = ["src", "tests", "examples", "scripts"]
+reportMissingTypeStubs = "none"
