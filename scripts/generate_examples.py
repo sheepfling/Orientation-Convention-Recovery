@@ -359,7 +359,7 @@ def _build_preference_profile() -> PreferenceProfile:
 
 
 def _write_synthetic_quaternion_csv(path: Path) -> None:
-    """Write the demo trajectory with portable 14-significant-digit values."""
+    """Write the demo trajectory with portable 12-significant-digit values."""
 
     time_s = np.arange(0.0, 4.0, 0.025)
     rates = rich_three_axis_rates(time_s)
@@ -380,7 +380,7 @@ def _write_synthetic_quaternion_csv(path: Path) -> None:
         for index in range(data.sample_count):
             writer.writerow(
                 tuple(
-                    format(float(value), ".14g")
+                    format(float(value), ".12g")
                     for value in (
                         data.time_s[index],
                         *data.orientation[index],
