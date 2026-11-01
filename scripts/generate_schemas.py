@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import math
 import tempfile
 from pathlib import Path
 
-from generate_examples import generate_examples
-
 from attitude_convention_inference.fusion import CohortFusionResult, EvidencePacket
+
+if __package__:
+    from .generate_examples import generate_examples
+else:
+    from generate_examples import generate_examples
+####
 
 
 def generate_schemas(root: Path) -> None:
@@ -40,15 +46,63 @@ def _generated_example_paths() -> tuple[str, ...]:
 ####
 
 
+def csv_matches_with_tolerance(expected_path: Path, generated_path: Path) -> bool:
+    """Compare generated numeric samples without requiring bit-identical integration."""
+
+    with expected_path.open(encoding="utf-8", newline="") as expected_file:
+        expected_rows = tuple(csv.reader(expected_file))
+    ####
+    with generated_path.open(encoding="utf-8", newline="") as generated_file:
+        generated_rows = tuple(csv.reader(generated_file))
+    ####
+    if len(expected_rows) != len(generated_rows) or not expected_rows:
+        return False
+    ####
+    if expected_rows[0] != generated_rows[0]:
+        return False
+    ####
+    for expected_row, generated_row in zip(expected_rows[1:], generated_rows[1:], strict=True):
+        if len(expected_row) != len(generated_row):
+            return False
+        ####
+        for expected_value, generated_value in zip(expected_row, generated_row, strict=True):
+            try:
+                expected_number = float(expected_value)
+                generated_number = float(generated_value)
+            except ValueError:
+                return False
+            ####
+            if not math.isclose(
+                expected_number,
+                generated_number,
+                rel_tol=1e-12,
+                abs_tol=1e-12,
+            ):
+                return False
+            ####
+        ####
+    ####
+    return True
+####
+
+
 def check_generated_files(root: Path) -> None:
     with tempfile.TemporaryDirectory(dir=root) as temporary_directory:
         generated_root = Path(temporary_directory)
         generate_schemas(generated_root)
-        mismatches = [
-            relative_path
-            for relative_path in _generated_example_paths()
-            if (root / relative_path).read_bytes() != (generated_root / relative_path).read_bytes()
-        ]
+        mismatches: list[str] = []
+        for relative_path in _generated_example_paths():
+            expected_path = root / relative_path
+            generated_path = generated_root / relative_path
+            if relative_path == "examples/synthetic_quaternion.csv":
+                matches = csv_matches_with_tolerance(expected_path, generated_path)
+            else:
+                matches = expected_path.read_bytes() == generated_path.read_bytes()
+            ####
+            if not matches:
+                mismatches.append(relative_path)
+            ####
+        ####
     ####
     if mismatches:
         details = "\n".join(f"  {path}" for path in mismatches)
