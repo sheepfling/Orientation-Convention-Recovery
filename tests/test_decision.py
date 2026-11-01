@@ -64,3 +64,82 @@ def test_decision_rejects_inconsistent_recommendation() -> None:
         )
     ####
 ####
+
+
+@pytest.mark.parametrize(
+    ("status", "reason", "recommended_class_id", "class_ids", "message"),
+    (
+        (
+            InferenceDecisionStatus.ABSTENTION,
+            InferenceDecisionReason.EVIDENCE_INSUFFICIENT,
+            None,
+            (" ",),
+            "non-empty strings",
+        ),
+        (
+            InferenceDecisionStatus.ABSTENTION,
+            InferenceDecisionReason.EVIDENCE_INSUFFICIENT,
+            None,
+            ("class-a", "class-a"),
+            "must be unique",
+        ),
+        (
+            InferenceDecisionStatus.RECOMMENDATION,
+            InferenceDecisionReason.EVIDENCE_INSUFFICIENT,
+            "class-a",
+            ("class-a",),
+            "recommendation requires a unique",
+        ),
+        (
+            InferenceDecisionStatus.RECOMMENDATION,
+            InferenceDecisionReason.UNIQUE_SUFFICIENT_EVIDENCE,
+            None,
+            ("class-a",),
+            "requires recommended_class_id",
+        ),
+        (
+            InferenceDecisionStatus.ABSTENTION,
+            InferenceDecisionReason.UNIQUE_SUFFICIENT_EVIDENCE,
+            None,
+            ("class-a",),
+            "abstention cannot use the recommendation reason",
+        ),
+        (
+            InferenceDecisionStatus.ABSTENTION,
+            InferenceDecisionReason.EVIDENCE_INSUFFICIENT,
+            "class-a",
+            ("class-a",),
+            "abstention cannot include recommended_class_id",
+        ),
+        (
+            InferenceDecisionStatus.ABSTENTION,
+            InferenceDecisionReason.MULTIPLE_EVIDENCE_CONTENDERS,
+            None,
+            ("class-a",),
+            "requires multiple class IDs",
+        ),
+        (
+            InferenceDecisionStatus.ABSTENTION,
+            InferenceDecisionReason.NO_EVIDENCE_CONTENDERS,
+            None,
+            ("class-a",),
+            "requires an empty class-ID tuple",
+        ),
+    ),
+)
+def test_decision_rejects_invalid_contract_combinations(
+    status: InferenceDecisionStatus,
+    reason: InferenceDecisionReason,
+    recommended_class_id: str | None,
+    class_ids: tuple[str, ...],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        InferenceDecision(
+            status=status,
+            reason=reason,
+            recommended_class_id=recommended_class_id,
+            evidence_contender_class_ids=class_ids,
+        )
+    ####
+####

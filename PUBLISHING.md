@@ -14,9 +14,16 @@ python scripts/check_distribution.py
 
 The distribution check builds an sdist, builds a wheel from that sdist, validates
 metadata with Twine, and imports the installed wheel from outside the checkout.
-It uses a temporary directory and does not leave release files in `dist/`.
-For an offline local check with build dependencies already installed, use
-`python scripts/check_distribution.py --no-isolation --skip-twine`.
+It also rejects direct-URL dependencies in either artifact's metadata, which
+public package indexes should not accept. The check uses a temporary directory
+and does not leave release files in `dist/`. The `publish` extra includes the
+build backend requirements so the offline check can reuse them without isolation.
+After installing `.[dev,publish]`, run
+`python scripts/check_distribution.py --no-isolation`. If Twine is not installed,
+`--skip-twine` skips only the metadata check; the wheel and sdist smoke checks
+still run. On restricted Windows environments, pass a short workspace-local
+scratch parent such as `--temp-dir .t`; the checker propagates it to build and
+install subprocesses as well as using it for the outer temporary directory.
 
 `scripts/ci.py` also compares public exports, function signatures, class
 constructor shapes, enum members, and generated model schemas against the local

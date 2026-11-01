@@ -194,7 +194,10 @@ def test_cli_writes_report_and_details(
     exit_code = main(arguments)
 
     assert exit_code == 0
-    assert "decision=" in capsys.readouterr().out
+    cli_output = capsys.readouterr().out
+    assert "decision=" in cli_output
+    assert "heuristic confidence score=" in cli_output
+    assert "evidence confidence=" not in cli_output
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["sample_count"] == 21
     assert payload["best"]["interval_rmse_rad"] < 1.0e-6

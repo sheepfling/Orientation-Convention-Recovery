@@ -10,31 +10,31 @@ from numpy import sum as np_sum
 from numpy.linalg import norm
 
 from .assessments import _dimension_assessments, _unresolved_dimensions
-from .core import TrajectoryData
+from .decoding import decode_attitudes
 from .evidence import _evidence_summary
+from .integration import ObservedIncrementCache
 from .math_utils import rotation_magnitudes as _rotation_magnitudes
 from .math_utils import rotation_quaternions as _rotation_quaternions
-from .models import ConfidenceLabel, InferenceConfig, InferenceReport, OverallDiagnostics
+from .model_common import confidence_label_for_score
+from .models import (
+    ConfidenceLabel,
+    InferenceConfig,
+    InferenceReport,
+    IntervalDiagnosticRow,
+    OverallDiagnostics,
+)
 from .scoring import ScoredCandidate as _ScoredCandidate
 from .scoring import score_hypothesis as _score_hypothesis
 from .scoring import score_partial_hypothesis as _score_partial_hypothesis
 from .statistics import effective_excitation_rank as _effective_excitation_rank
 from .statistics import raw_rate_excitation as _raw_rate_excitation
+from .trajectory import TrajectoryData
 
 __all__ = ["_build_overall_diagnostics", "best_interval_diagnostics"]
 
 
 def _confidence_label(value: float) -> ConfidenceLabel:
-    if value >= 0.75:
-        return ConfidenceLabel.HIGH
-    ####
-    if value >= 0.50:
-        return ConfidenceLabel.MODERATE
-    ####
-    if value >= 0.20:
-        return ConfidenceLabel.LOW
-    ####
-    return ConfidenceLabel.INDETERMINATE
+    return confidence_label_for_score(value)
 ####
 
 
@@ -68,13 +68,35 @@ def _build_overall_diagnostics(
     )
     unresolved = _unresolved_dimensions(evidence_near_ties)
     posterior_unresolved = _unresolved_dimensions(posterior_near_ties)
-    detailed = (
-        _score_partial_hypothesis(
-            data, best.result.hypothesis, config, retain_interval_details=True
+    detailed_attitudes = None
+    detailed_observed_cache = None
+    if (
+        data.orientation is not None
+        and data.rates is not None
+        and data.time_s is None
+        and config.sample_period_s is None
+        and config.infer_sample_period_when_missing
+    ):
+        detailed_attitudes = decode_attitudes(data, best.result.hypothesis)
+        detailed_observed_cache = ObservedIncrementCache(detailed_attitudes)
+    ####
+    if data.orientation is None or data.rates is None:
+        detailed = _score_partial_hypothesis(
+            data,
+            best.result.hypothesis,
+            config,
+            retain_interval_details=True,
         )
-        if data.orientation is None or data.rates is None
-        else _score_hypothesis(data, best.result.hypothesis, config, retain_interval_details=True)
-    )
+    else:
+        detailed = _score_hypothesis(
+            data,
+            best.result.hypothesis,
+            config,
+            attitudes=detailed_attitudes,
+            observed_increment_cache=detailed_observed_cache,
+            retain_interval_details=True,
+        )
+    ####
     details = detailed.interval_details
     if details is None:
         raise RuntimeError("Interval details were not retained for diagnostics")
@@ -166,7 +188,13 @@ def _build_overall_diagnostics(
             "Multiple convention hypotheses remain within the configured empirical evidence margin."
         )
     ####
-    if len(ranked) > 1 and not evidence_sufficient:
+    if evidence.dependence_limited:
+        warnings.append(
+            "Residuals are strongly temporally dependent at a measurable scale, so the "
+            "independent-increment evidence is withheld; model temporal dependence or "
+            "collect independent evidence before relying on a recommendation."
+        )
+    elif len(ranked) > 1 and not evidence_sufficient:
         warnings.append(
             "The leading convention did not achieve a stable evidence threshold before "
             "the end of the trajectory; use the full file or collect more informative motion."
@@ -292,7 +320,13 @@ def best_interval_diagnostics(
     data: TrajectoryData,
     report: InferenceReport,
     config: InferenceConfig | None = None,
-) -> tuple[dict[str, float | int | bool], ...]:
+) -> tuple[IntervalDiagnosticRow, ...]:
+    """Return named, CSV-ready comparisons for each adjacent sample pair.
+
+    The optional ``time_start_s`` and ``time_end_s`` keys are present only when
+    ``data.time_s`` contains timestamps.
+    """
+
     if data.orientation is None or data.rates is None:
         raise ValueError("Interval diagnostics require both orientation and angular rates")
     ####
@@ -310,10 +344,10 @@ def best_interval_diagnostics(
     if errors is None:
         raise RuntimeError("Interval residual vectors were not retained for diagnostics")
     ####
-    rows: list[dict[str, float | int | bool]] = []
+    rows: list[IntervalDiagnosticRow] = []
 
     for index in range(data.sample_count - 1):
-        row: dict[str, float | int | bool] = {
+        row: IntervalDiagnosticRow = {
             "interval": index,
             "dt_s": float(details.interval_durations_s[index]),
             "omega_x_rad_s": float(

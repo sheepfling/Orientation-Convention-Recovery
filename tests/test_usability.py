@@ -6,9 +6,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
+from numpy.typing import ArrayLike
 
 from attitude_convention_inference import (
     AttitudeRepresentation,
@@ -22,27 +24,34 @@ from attitude_convention_inference import (
 from attitude_convention_inference.cli import main
 
 
-def _write_z_rotation_csv(path: Path, sample_count: int = 21) -> None:
+def _write_z_rotation_csv(
+    path: Path,
+    sample_count: int = 21,
+    *,
+    include_time: bool = True,
+) -> None:
     with path.open("w", encoding="utf-8", newline="") as stream:
-        writer = csv.DictWriter(
-            stream,
-            fieldnames=("time_s", "qx", "qy", "qz", "qw", "p", "q", "r"),
-        )
-        writer.writeheader()
+        writer = csv.writer(stream)
+        fieldnames = ("time_s", "qx", "qy", "qz", "qw", "p", "q", "r")
+        if not include_time:
+            fieldnames = fieldnames[1:]
+        ####
+        writer.writerow(fieldnames)
         for index in range(sample_count):
             angle = 0.01 * index
-            writer.writerow(
-                {
-                    "time_s": 0.01 * index,
-                    "qx": 0.0,
-                    "qy": 0.0,
-                    "qz": np.sin(angle / 2.0),
-                    "qw": np.cos(angle / 2.0),
-                    "p": 0.0,
-                    "q": 0.0,
-                    "r": 1.0,
-                }
-            )
+            row = [
+                0.0,
+                0.0,
+                np.sin(angle / 2.0),
+                np.cos(angle / 2.0),
+                0.0,
+                0.0,
+                1.0,
+            ]
+            if include_time:
+                row.insert(0, 0.01 * index)
+            ####
+            writer.writerow(row)
         ####
     ####
 ####
@@ -178,8 +187,28 @@ def test_cli_inspect_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
 
     assert main([str(source), "--inspect", "--format", "json"]) == 0
     payload = json.loads(capsys.readouterr().out)
+    assert set(payload) == {
+        "representation",
+        "orientation_columns",
+        "rate_columns",
+        "time_column",
+        "available_columns",
+    }
     assert payload["orientation_columns"] == ["qx", "qy", "qz", "qw"]
+    assert payload["rate_columns"] == ["p", "q", "r"]
     assert payload["time_column"] == "time_s"
+####
+
+
+def test_cli_inspect_json_reports_null_time_column(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = tmp_path / "trajectory-without-time.csv"
+    _write_z_rotation_csv(source, include_time=False)
+
+    assert main([str(source), "--inspect", "--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["time_column"] is None
 ####
 
 
@@ -241,12 +270,15 @@ def test_detect_csv_layout_for_euler_columns(tmp_path: Path) -> None:
 def test_negative_sample_period_override_is_rejected() -> None:
     with pytest.raises(ValueError, match="sample_period_s"):
         infer_attitude_conventions(
-            orientation=(
-                (0.0, 0.0, 0.0, 1.0),
-                (0.0, 0.0, 0.0, 1.0),
-                (0.0, 0.0, 0.0, 1.0),
+            orientation=cast(
+                ArrayLike,
+                (
+                    (0.0, 0.0, 0.0, 1.0),
+                    (0.0, 0.0, 0.0, 1.0),
+                    (0.0, 0.0, 0.0, 1.0),
+                ),
             ),
-            rates=((0.0, 0.0, 0.0),) * 3,
+            rates=cast(ArrayLike, ((0.0, 0.0, 0.0),) * 3),
             representation="quaternion",
             sample_period_s=-0.1,
         )

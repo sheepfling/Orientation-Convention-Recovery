@@ -41,7 +41,7 @@ def _generated_example_paths() -> tuple[str, ...]:
 
 
 def check_generated_files(root: Path) -> None:
-    with tempfile.TemporaryDirectory() as temporary_directory:
+    with tempfile.TemporaryDirectory(dir=root) as temporary_directory:
         generated_root = Path(temporary_directory)
         generate_schemas(generated_root)
         mismatches = [

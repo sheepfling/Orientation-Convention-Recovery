@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import get_type_hints
 from weakref import ReferenceType, ref
 
 import pytest
@@ -19,6 +20,7 @@ from attitude_convention_inference import (
     ConventionPriors,
     EulerMode,
     InferenceConfig,
+    IntervalDiagnosticRow,
     QuaternionOrder,
     RateFrame,
     RateUnit,
@@ -55,7 +57,13 @@ def test_full_scoring_retains_interval_details_only_on_request() -> None:
         compact.interval_squared_errors_rad2,
         np_sum(square(detailed.interval_error_rotvecs), axis=1),
     )
-    assert len(best_interval_diagnostics(data, report, config)) == data.sample_count - 1
+    interval_rows = best_interval_diagnostics(data, report, config)
+    assert get_type_hints(best_interval_diagnostics)["return"] == tuple[IntervalDiagnosticRow, ...]
+    assert len(interval_rows) == data.sample_count - 1
+    assert interval_rows[0]["interval"] == 0
+    assert "time_start_s" in interval_rows[0]
+    assert "time_end_s" in interval_rows[0]
+    assert IntervalDiagnosticRow.__optional_keys__ == {"time_start_s", "time_end_s"}
 ####
 
 

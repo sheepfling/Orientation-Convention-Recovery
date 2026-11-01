@@ -139,6 +139,22 @@ class CalibrationDescriptor(FrozenModel):
     effective_sample_definition: str | None = None
 
     def __post_init__(self) -> None:
+        for name in ("calibration_id", "validation_domain", "effective_sample_definition"):
+            value = getattr(self, name)
+            if value is not None:
+                normalized = value.strip()
+                if not normalized:
+                    raise ValueError(f"{name} must be non-empty when provided")
+                ####
+                object.__setattr__(self, name, normalized)
+            ####
+        ####
+        if self.validated and self.calibration_id is None:
+            raise ValueError("validated calibration requires calibration_id")
+        ####
+        if self.validated and self.validation_domain is None:
+            raise ValueError("validated calibration requires validation_domain")
+        ####
         if self.temperature is not None and (
             not math.isfinite(float(self.temperature)) or self.temperature <= 0.0
         ):
@@ -150,7 +166,7 @@ class CalibrationDescriptor(FrozenModel):
 
 @dataclass(frozen=True, slots=True)
 class LineageDescriptor(FrozenModel):
-    """Atomic source and derivation lineage used for dependence checks."""
+    """Source lineage and inclusive sensor-time bounds used for dependence checks."""
 
     atomic_source_ids: Sequence[str] | set[str] | frozenset[str] = ()
     parent_packet_ids: Sequence[str] | set[str] | frozenset[str] = ()
@@ -171,6 +187,9 @@ class LineageDescriptor(FrozenModel):
                 value = (value,)
             ####
             object.__setattr__(self, name, _string_tuple(value, name))
+        ####
+        if (self.time_start_ns is None) != (self.time_end_ns is None):
+            raise ValueError("time_start_ns and time_end_ns must be provided together")
         ####
         if (
             self.time_start_ns is not None
@@ -205,6 +224,16 @@ class EvidencePacket(FrozenModel):
     warnings: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        for name in ("schema_version", "packet_id", "quotient_space_id"):
+            value = getattr(self, name).strip()
+            if not value:
+                raise ValueError(f"{name} must be non-empty")
+            ####
+            object.__setattr__(self, name, value)
+        ####
+        if self.schema_version != "1.0":
+            raise ValueError(f"unsupported EvidencePacket schema_version: {self.schema_version!r}")
+        ####
         class_ids = _string_tuple(self.class_ids, "class_ids")
         if not class_ids:
             raise ValueError("class_ids must be non-empty")
@@ -273,6 +302,8 @@ class EvidencePacket(FrozenModel):
                 EvidenceSemantics.CALIBRATED_GENERALIZED,
             }
             and self.calibration.validated
+            and self.calibration.calibration_id is not None
+            and self.calibration.validation_domain is not None
         )
     ####
 
@@ -484,6 +515,15 @@ def build_shared_prototype(
     ####
     class_ids = _validate_compatibility(reference_packets)
     _validate_lineage(reference_packets, strict=strict_lineage)
+    if power_weights is not None:
+        unknown_packet_ids = set(power_weights).difference(
+            packet.packet_id for packet in reference_packets
+        )
+        if unknown_packet_ids:
+            rendered_ids = sorted(unknown_packet_ids, key=str)
+            raise ValueError(f"power_weights contain unknown packet IDs: {rendered_ids!r}")
+        ####
+    ####
     prior_vector = _resolve_baseline_prior(class_ids, baseline_prior)
     log_weights = log(prior_vector)
     for packet in reference_packets:
@@ -542,9 +582,6 @@ def fuse_target_with_robust_borrowing(
         ####
     ####
     all_packets = [*reference_packets, target_packet]
-    if len({packet.packet_id for packet in all_packets}) != len(all_packets):
-        raise ValueError("packet IDs must be unique within one fusion")
-    ####
     class_ids = _validate_compatibility(all_packets)
     _validate_lineage(all_packets, strict=strict_lineage)
     prior_vector = _resolve_baseline_prior(class_ids, baseline_prior)
@@ -645,6 +682,10 @@ def _validate_compatibility(packets: Sequence[EvidencePacket]) -> tuple[str, ...
     if not packets:
         raise ValueError("at least one packet is required")
     ####
+    packet_ids = tuple(packet.packet_id for packet in packets)
+    if len(set(packet_ids)) != len(packet_ids):
+        raise ValueError("packet IDs must be unique across cohort packets")
+    ####
     first = packets[0]
     for packet in packets[1:]:
         if packet.quotient_space_id != first.quotient_space_id:
@@ -689,6 +730,32 @@ def _validate_lineage(packets: Sequence[EvidencePacket], *, strict: bool) -> Non
                     "dependent packets share dependency groups: "
                     f"{left.packet_id!r}, {right.packet_id!r}, overlap={sorted(group_overlap)!r}"
                 )
+            ####
+            shared_sensors = set(left.lineage.sensor_ids) & set(right.lineage.sensor_ids)
+            if shared_sensors:
+                if (
+                    left.lineage.time_start_ns is None
+                    or left.lineage.time_end_ns is None
+                    or right.lineage.time_start_ns is None
+                    or right.lineage.time_end_ns is None
+                ):
+                    raise ValueError(
+                        f"packets {left.packet_id!r} and {right.packet_id!r} share sensor IDs "
+                        "but lack complete time bounds required by strict lineage: "
+                        f"{sorted(shared_sensors)!r}"
+                    )
+                ####
+                windows_overlap = (
+                    left.lineage.time_start_ns <= right.lineage.time_end_ns
+                    and right.lineage.time_start_ns <= left.lineage.time_end_ns
+                )
+                if windows_overlap:
+                    raise ValueError(
+                        f"dependent packets {left.packet_id!r} and {right.packet_id!r} "
+                        "share sensor IDs and overlapping time windows: "
+                        f"{sorted(shared_sensors)!r}"
+                    )
+                ####
             ####
             if (
                 left.packet_id in right.lineage.parent_packet_ids
@@ -773,7 +840,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--reference", type=Path, action="append", required=True)
     parser.add_argument("--prior-sharedness", type=float, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--allow-unknown-or-overlapping-lineage", action="store_true")
+    parser.add_argument(
+        "--allow-unknown-or-overlapping-lineage",
+        action="store_true",
+        help="skip lineage dependence checks; use only with externally verified independence",
+    )
     parser.add_argument("--accept-probability", type=float, default=0.80)
     parser.add_argument("--accept-margin", type=float, default=0.20)
     parser.add_argument("--minimum-sharedness", type=float, default=0.50)

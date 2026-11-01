@@ -6,6 +6,7 @@ import argparse
 import json
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TypedDict
 
 from .api import infer_conventions, resolve_config
 from .inference import best_interval_diagnostics
@@ -33,6 +34,17 @@ from .profiles import available_preference_profiles, load_preference_profile
 from .version import __version__
 
 __all__ = ["main"]
+
+
+class _CsvLayoutPayload(TypedDict):
+    """JSON fields printed by ``--inspect --format json``."""
+
+    representation: str
+    orientation_columns: list[str]
+    rate_columns: list[str]
+    time_column: str | None
+    available_columns: list[str]
+####
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -212,7 +224,7 @@ def _cli_constraints(arguments: argparse.Namespace) -> ConventionConstraints:
 ####
 
 
-def _layout_payload(layout: CsvLayout) -> dict[str, object]:
+def _layout_payload(layout: CsvLayout) -> _CsvLayoutPayload:
     return {
         "representation": layout.representation.value,
         "orientation_columns": list(layout.orientation_columns),
@@ -313,7 +325,8 @@ def _print_report(report_json: str, top: int, decision: InferenceDecision) -> No
         ####
     ####
     print(
-        f"evidence confidence={diagnostics['confidence_label']} ({diagnostics['confidence']:.3f})"
+        "heuristic confidence score="
+        f"{diagnostics['confidence_label']} ({diagnostics['confidence']:.3f})"
     )
     print(
         f"noise model={diagnostics['noise_model']}  "

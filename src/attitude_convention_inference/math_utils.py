@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from numpy import amin, asarray, ceil, clip, exp, float64, mean, sort, square
+from numpy import amin, asarray, ceil, clip, exp, float64, int64, mean, sort, square
 from numpy import sum as np_sum
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
@@ -18,12 +18,16 @@ FloatArray = NDArray[float64]
 
 __all__ = [
     "FloatArray",
+    "mean_float",
+    "rotation_apply",
     "rotation_from_euler",
     "rotation_from_quat",
     "rotation_from_rotvec",
     "rotation_magnitudes",
+    "rotation_product",
     "rotation_quaternions",
     "rotation_rotvecs",
+    "rotation_take",
     "support_weights",
     "trimmed_mean_square",
 ]
@@ -57,6 +61,27 @@ def rotation_from_rotvec(rotvecs: FloatArray) -> Rotation:
 ####
 
 
+def rotation_apply(rotation: Rotation, vectors: FloatArray) -> FloatArray:
+    """Apply a SciPy rotation to typed vectors across version-dependent stubs."""
+
+    return asarray(cast(Any, rotation).apply(vectors), dtype=float64)
+####
+
+
+def rotation_product(left: Rotation, right: Rotation) -> Rotation:
+    """Compose SciPy rotations across version-dependent operator stubs."""
+
+    return cast(Rotation, cast(Any, left) * right)
+####
+
+
+def rotation_take(rotation: Rotation, indices: NDArray[int64]) -> Rotation:
+    """Select a batch of SciPy rotations using integer-array indices."""
+
+    return cast(Rotation, cast(Any, rotation)[indices])
+####
+
+
 def rotation_magnitudes(rotation: Rotation) -> FloatArray:
     """Return rotation magnitudes as a typed floating-point array."""
 
@@ -75,6 +100,13 @@ def rotation_quaternions(rotation: Rotation) -> FloatArray:
     """Return scalar-last quaternions as a typed floating-point array."""
 
     return asarray(cast(Any, rotation).as_quat(), dtype=float64)
+####
+
+
+def mean_float(values: FloatArray) -> float:
+    """Return a scalar mean with a stable Python-float boundary."""
+
+    return float(asarray(mean(values), dtype=float64).item())
 ####
 
 

@@ -8,6 +8,7 @@ from math import exp, log
 
 from numpy import (
     argsort,
+    asarray,
     ceil,
     cumsum,
     diff,
@@ -30,9 +31,9 @@ from numpy import (
 )
 from numpy.linalg import eigvalsh, norm, svd
 
-from .core import TrajectoryData
-from .math_utils import FloatArray
+from .math_utils import FloatArray, mean_float
 from .models import InferenceConfig
+from .trajectory import TrajectoryData
 
 __all__ = [
     "ExcitationSummary",
@@ -152,8 +153,8 @@ def estimate_noise_process(
     centered = interval_error_rotvecs - robust_center
     squared_norms = np_sum(centered * centered, axis=1)
     keep_indices = argsort(squared_norms)[:keep_count]
-    kept = squared_norms[keep_indices]
-    sigma = float(sqrt(max(float(mean(kept)) / 3.0, 1.0e-24)))
+    kept = asarray(squared_norms[keep_indices], dtype=float64)
+    sigma = float(sqrt(max(mean_float(kept) / 3.0, 1.0e-24)))
 
     keep_mask = zeros(centered.shape[0], dtype=bool)
     keep_mask[keep_indices] = True

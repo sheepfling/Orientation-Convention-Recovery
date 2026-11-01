@@ -12,6 +12,8 @@ from attitude_convention_inference import (
     AttitudeRepresentation,
     EulerMode,
     InferenceConfig,
+    InferenceDecisionReason,
+    InferenceDecisionStatus,
     QuaternionOrder,
     RateFrame,
     RateUnit,
@@ -128,6 +130,8 @@ def test_zero_motion_reports_ambiguity_instead_of_confidence() -> None:
     assert len(report.evidence_contender_class_ids) > 1
     assert report.diagnostics.confidence < 0.5
     assert report.diagnostics.warnings
+    assert report.decision.status is InferenceDecisionStatus.ABSTENTION
+    assert report.decision.reason is InferenceDecisionReason.EVIDENCE_INSUFFICIENT
 ####
 
 
@@ -145,6 +149,8 @@ def test_single_axis_motion_reports_partial_excitation() -> None:
     assert report.diagnostics.raw_excitation_rank < 3
     assert report.diagnostics.warnings
     assert report.diagnostics.confidence < 0.95
+    assert report.decision.status is InferenceDecisionStatus.ABSTENTION
+    assert report.decision.reason is InferenceDecisionReason.EVIDENCE_INSUFFICIENT
 ####
 
 
@@ -261,6 +267,26 @@ def test_slow_timestamp_drift_stays_valid_but_reduces_fit_quality() -> None:
     assert report.diagnostics.time_source == "timestamps"
     assert np.isfinite(report.best.interval_rmse_rad)
     assert report.best.interval_rmse_rad > 1.0e-4
+####
+
+
+def test_absolute_epoch_seconds_preserve_convention_recovery() -> None:
+    data = _trajectory(count=161)
+    if data.time_s is None:
+        raise AssertionError("test trajectory must contain timestamps")
+    ####
+    baseline = infer_conventions(data, _config())
+    epoch_data = replace(data, time_s=data.time_s + 1_700_000_000.0)
+
+    epoch_report = infer_conventions(epoch_data, _config())
+
+    assert epoch_report.best.hypothesis == baseline.best.hypothesis
+    assert epoch_report.decision.status is baseline.decision.status
+    assert epoch_report.best.interval_rmse_rad == pytest.approx(
+        baseline.best.interval_rmse_rad,
+        abs=1.0e-6,
+    )
+    assert epoch_report.diagnostics.time_source == "timestamps"
 ####
 
 

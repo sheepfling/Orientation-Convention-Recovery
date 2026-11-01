@@ -8,6 +8,7 @@ import pytest
 from numpy import amax
 from scipy.spatial.transform import Rotation
 
+import attitude_convention_inference.integration as integration_module
 from attitude_convention_inference import (
     AttitudeDirection,
     AttitudeRepresentation,
@@ -22,9 +23,13 @@ from attitude_convention_inference import (
 from attitude_convention_inference.core import (
     FloatArray,
     IncrementWindowComposer,
+    ObservedIncrementCache,
     TrajectoryData,
     compose_increment_windows,
+    observed_interval_increments,
+    observed_window_increments,
 )
+from attitude_convention_inference.math_utils import rotation_product
 from attitude_convention_inference.synthetic import (
     SyntheticConvention,
     encode_synthetic_trajectory,
@@ -296,7 +301,11 @@ def test_prefix_window_products_match_direct_noncommutative_products(frame: Rate
             total = Rotation.identity()
             for offset in range(window_size):
                 increment = increments[int(start + offset)]
-                total = total * increment if frame is RateFrame.BODY else increment * total
+                total = (
+                    rotation_product(total, increment)
+                    if frame is RateFrame.BODY
+                    else rotation_product(increment, total)
+                )
             ####
             expected.append(total)
         ####
@@ -310,6 +319,160 @@ def test_prefix_window_products_match_direct_noncommutative_products(frame: Rate
             _quaternions(accelerated.window_increments), abs=1.0e-12
         )
     ####
+####
+
+
+@pytest.mark.parametrize("frame", tuple(RateFrame))
+def test_observed_increment_cache_matches_and_reuses_direct_rotations(frame: RateFrame) -> None:
+    attitudes = _from_rotvec(
+        np.asarray(
+            [
+                (0.12, -0.08, 0.03),
+                (-0.04, 0.19, 0.11),
+                (0.23, 0.02, -0.14),
+                (-0.17, 0.09, 0.21),
+                (0.06, -0.22, 0.07),
+                (0.15, 0.13, -0.18),
+                (-0.09, -0.05, 0.16),
+            ],
+            dtype=np.float64,
+        )
+    )
+    cache = ObservedIncrementCache(attitudes)
+
+    cached_intervals = cache.interval_increments(frame)
+    assert cache.interval_increments(frame) is cached_intervals
+    direct_intervals = observed_interval_increments(attitudes, frame)
+    np.testing.assert_allclose(
+        _magnitudes(cached_intervals.inv() * direct_intervals),
+        0.0,
+        atol=1e-12,
+    )
+
+    for window_size in (1, 2, 6):
+        cached_windows = cache.window_composition(window_size, frame)
+        assert cache.window_composition(window_size, frame) is cached_windows
+        np.testing.assert_array_equal(
+            cached_windows.starts,
+            np.arange(0, len(attitudes) - window_size, dtype=np.int64),
+        )
+        direct_windows = observed_window_increments(
+            attitudes,
+            cached_windows.starts,
+            window_size,
+            frame,
+        )
+        np.testing.assert_allclose(
+            _magnitudes(cached_windows.window_increments.inv() * direct_windows),
+            0.0,
+            atol=1e-12,
+        )
+    ####
+####
+
+
+def test_inference_computes_observed_windows_once_per_frame_and_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    time_s = np.arange(31, dtype=np.float64) * 0.02
+    data = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s), _truth())
+    window_sizes = (1, 2, 4)
+    config = InferenceConfig(
+        search_space=SearchSpace(
+            attitude_directions=(_truth().attitude_direction,),
+            quaternion_orders=(QuaternionOrder.SCALAR_LAST,),
+            rate_frames=tuple(RateFrame),
+            rate_orders=("pqr",),
+            rate_units=(RateUnit.RADIANS_PER_SECOND,),
+            rate_signs=(-1, 1),
+        ),
+        window_sizes=window_sizes,
+    )
+    original = integration_module.observed_window_increments
+    calls: dict[tuple[RateFrame, int], int] = {}
+
+    def counted_observed_windows(
+        attitudes: Rotation,
+        starts: Any,
+        window_size: int,
+        frame: RateFrame,
+    ) -> Rotation:
+        key = (frame, window_size)
+        calls[key] = calls.get(key, 0) + 1
+        return original(attitudes, starts, window_size, frame)
+    ####
+
+    monkeypatch.setattr(
+        integration_module,
+        "observed_window_increments",
+        counted_observed_windows,
+    )
+
+    report = infer_conventions(data, config)
+
+    assert report.hypothesis_count == 4
+    assert calls == {(frame, size): 1 for frame in RateFrame for size in window_sizes}
+####
+
+
+def test_missing_time_refinement_reuses_observed_rotations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    time_s = np.arange(31, dtype=np.float64) * 0.02
+    timed_data = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s), _truth())
+    data = TrajectoryData(
+        representation=timed_data.representation,
+        orientation=timed_data.orientation,
+        rates=timed_data.rates,
+        time_s=None,
+    )
+    window_sizes = (1, 2)
+    config = InferenceConfig(
+        search_space=SearchSpace(
+            attitude_directions=(AttitudeDirection.BODY_TO_WORLD,),
+            quaternion_orders=(QuaternionOrder.SCALAR_LAST,),
+            rate_frames=tuple(RateFrame),
+            rate_orders=("pqr",),
+            rate_units=(RateUnit.RADIANS_PER_SECOND,),
+            rate_signs=(-1, 1),
+        ),
+        window_sizes=window_sizes,
+    )
+    original_intervals = integration_module.observed_interval_increments
+    original_windows = integration_module.observed_window_increments
+    interval_calls: dict[RateFrame, int] = {}
+    window_calls: dict[tuple[RateFrame, int], int] = {}
+
+    def counted_intervals(attitudes: Rotation, frame: RateFrame) -> Rotation:
+        interval_calls[frame] = interval_calls.get(frame, 0) + 1
+        return original_intervals(attitudes, frame)
+    ####
+
+    def counted_windows(
+        attitudes: Rotation,
+        starts: Any,
+        window_size: int,
+        frame: RateFrame,
+    ) -> Rotation:
+        key = (frame, window_size)
+        window_calls[key] = window_calls.get(key, 0) + 1
+        return original_windows(attitudes, starts, window_size, frame)
+    ####
+
+    monkeypatch.setattr(integration_module, "observed_interval_increments", counted_intervals)
+    monkeypatch.setattr(integration_module, "observed_window_increments", counted_windows)
+
+    report = infer_conventions(data, config)
+
+    assert report.hypothesis_count == 4
+    assert report.diagnostics.time_source == "inferred_sample_period"
+    detailed_frame = RateFrame(report.best.hypothesis.rate_frame)
+    assert interval_calls == {frame: 1 + int(frame is detailed_frame) for frame in RateFrame}
+    assert window_calls == {
+        (frame, size): 1 + int(frame is detailed_frame)
+        for frame in RateFrame
+        for size in window_sizes
+    }
 ####
 
 
@@ -328,7 +491,11 @@ def test_long_prefix_products_match_direct_rotations(frame: RateFrame) -> None:
             total = Rotation.identity()
             for offset in range(window_size):
                 increment = increments[int(start + offset)]
-                total = total * increment if frame is RateFrame.BODY else increment * total
+                total = (
+                    rotation_product(total, increment)
+                    if frame is RateFrame.BODY
+                    else rotation_product(increment, total)
+                )
             ####
             expected.append(total)
         ####

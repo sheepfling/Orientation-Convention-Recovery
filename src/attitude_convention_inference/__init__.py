@@ -4,10 +4,11 @@ from .api import (
     infer_attitude_conventions,
     infer_conventions,
     infer_csv,
+    infer_sparse_orientation_conventions,
     inspect_csv,
     resolve_config,
 )
-from .core import TrajectoryData, should_prune_by_exact_lower_bound
+from .calibration_diagnostics import assess_rate_polarity_sensitivity, inspect_rate_rails
 from .fusion import (
     CalibrationDescriptor,
     CohortFusionResult,
@@ -45,9 +46,15 @@ from .models import (
     InferenceDecisionReason,
     InferenceDecisionStatus,
     InferenceReport,
+    IntervalDiagnosticRow,
     PreferenceProfile,
     QuaternionOrder,
     RateFrame,
+    RateInputChannelRailHits,
+    RateInputRailLimits,
+    RatePolarityProfileFit,
+    RatePolaritySensitivityReport,
+    RateRailInspectionReport,
     RateUnit,
     ResultLabel,
     ScaleRisk,
@@ -61,6 +68,8 @@ from .profiles import (
     compose_preference_profiles,
     load_preference_profile,
 )
+from .pruning import should_prune_by_exact_lower_bound
+from .trajectory import SparseOrientationRateData, TrajectoryData
 from .version import __version__
 
 __all__ = [
@@ -90,19 +99,27 @@ __all__ = [
     "InferenceDecisionReason",
     "InferenceDecisionStatus",
     "InferenceReport",
+    "IntervalDiagnosticRow",
     "LineageDescriptor",
     "LogOddsExplanation",
     "PreferenceProfile",
     "QuaternionOrder",
     "RateFrame",
+    "RateInputChannelRailHits",
+    "RateInputRailLimits",
+    "RatePolarityProfileFit",
+    "RatePolaritySensitivityReport",
+    "RateRailInspectionReport",
     "RateUnit",
     "ResultLabel",
     "ScaleRisk",
     "SearchSpace",
+    "SparseOrientationRateData",
     "TrajectoryData",
     "WeightedPreferenceProfile",
     "WrapUnitStatus",
     "__version__",
+    "assess_rate_polarity_sensitivity",
     "available_preference_profiles",
     "best_interval_diagnostics",
     "build_shared_prototype",
@@ -114,7 +131,9 @@ __all__ = [
     "infer_attitude_conventions",
     "infer_conventions",
     "infer_csv",
+    "infer_sparse_orientation_conventions",
     "inspect_csv",
+    "inspect_rate_rails",
     "load_csv_trajectory",
     "load_evidence_packet",
     "load_preference_profile",

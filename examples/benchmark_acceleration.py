@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
 from attitude_convention_inference.core import FloatArray, compose_increment_windows
+from attitude_convention_inference.math_utils import rotation_product
 from attitude_convention_inference.models import RateFrame
 
 
@@ -49,7 +50,11 @@ def _direct_windows(
         total = Rotation.identity()
         for offset in range(window_size):
             increment = increments[int(start + offset)]
-            total = total * increment if frame is RateFrame.BODY else increment * total
+            total = (
+                rotation_product(total, increment)
+                if frame is RateFrame.BODY
+                else rotation_product(increment, total)
+            )
         ####
         outputs.append(asarray(cast(Any, total).as_quat(), dtype=float64))
     ####

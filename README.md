@@ -123,6 +123,10 @@ attitude-conventions trajectory.csv --inspect
 attitude-conventions trajectory.csv --inspect --format json
 ```
 
+The JSON layout object has `representation`, `orientation_columns`,
+`rate_columns`, `time_column`, and `available_columns` fields; `time_column` is
+`null` when no time column is detected.
+
 Override detection when necessary:
 
 ```bash
@@ -170,6 +174,12 @@ print(report.diagnostics.model_dump_json(indent=2))
 ####
 ```
 
+`time_s` is expressed in seconds and may have a nonzero or absolute clock origin;
+inference uses differences between samples. If timestamps are integer epoch
+nanoseconds (or another high-resolution integer clock), subtract the first
+timestamp before converting to floating-point seconds so the small sample
+intervals retain precision. CSV timestamps are likewise interpreted as seconds.
+
 Validated trajectory arrays and the mapping fields inside configuration, profile,
 packet, and report models are copied into read-only snapshots. Changing an input
 dictionary after construction cannot change a result. Use `model_copy(update=...)`
@@ -200,6 +210,49 @@ trajectory = TrajectoryData(
 report = infer_conventions(trajectory, InferenceConfig())
 ####
 ```
+
+### Sparse orientation anchors with dense rates
+
+Orientation observations do not need to share the gyro's sampling cadence. Use
+`SparseOrientationRateData` when orientations are available only at occasional,
+timestamped poses while rates are recorded densely:
+
+```python
+import numpy as np
+
+from attitude_convention_inference import (
+    AttitudeRepresentation,
+    SparseOrientationRateData,
+    infer_sparse_orientation_conventions,
+)
+
+data = SparseOrientationRateData(
+    representation=AttitudeRepresentation.QUATERNION,
+    orientation_anchors=np.asarray(anchor_quaternions),
+    orientation_anchor_times_s=np.asarray(anchor_times_s),
+    rates=np.asarray(gyro_xyz),
+    rate_times_s=np.asarray(gyro_times_s),
+)
+report = infer_sparse_orientation_conventions(data)
+```
+
+Both timestamp arrays are seconds on the same clock. The rate stream must cover
+every orientation anchor; extrapolation is rejected. For each candidate rate
+convention, inference linearly interpolates the rate signal at anchor times,
+integrates every dense sample interval, then compares the composed net rotation
+with the observed change between anchors. It does not interpolate orientations
+or discard the rate samples between poses. This supports quaternion or Euler
+anchors and irregular timestamps.
+
+In these reports, `sample_count` is the orientation-anchor count and
+`rate_sample_count` is the dense rate-sample count. Sequential evidence uses
+alternating adjacent anchor intervals so an anchor shared by neighboring
+intervals is not counted twice. With few anchors or strongly dependent residuals,
+the evidence gate may abstain; the rate trace can still improve relative-fit
+ranking, but it cannot create missing independent pose observations.
+
+The repeatable sparse-cadence/noise sensitivity study and its limitations are
+documented in the [validation notes](docs/VALIDATION.md#sparse-orientation-anchors-with-dense-rates).
 
 `infer_attitude_conventions` remains as a compatibility alias, but new code should use `infer_conventions`.
 
@@ -403,7 +456,11 @@ Evidence semantics are explicit. `calibrated-likelihood` and
 `calibrated-generalized` packets may produce a posterior only when every packet passes
 the calibration and lineage gates. `generalized-weight` and `uncalibrated-risk`
 packets still support ranking and borrowing, but the fusion result is labeled
-`cohort-weight-only`.
+`cohort-weight-only`. A validated calibration must carry a non-empty calibration ID
+and validation domain; packets must carry non-empty packet and quotient-space IDs, and
+packet IDs must be unique within a coalescence or fusion operation. The packet format
+currently accepts schema version `1.0`; unsupported versions are rejected explicitly.
+Power-weight mappings must refer only to packet IDs in the supplied cohort.
 
 Reference packets can be coalesced into a shared quotient-class prototype and then
 borrowed by a weak target through the robust sharedness mixture:
@@ -424,9 +481,15 @@ print(fusion.status, fusion.fused_posterior, fusion.posterior_sharedness)
 ```
 
 Strict fusion rejects mismatched quotient spaces, duplicate class ordering, overlapping
-atomic sources, shared dependency groups, and direct packet derivation. The local target
-packet remains unchanged; the result reports local, prototype, borrowed, and fused
-class distributions side by side. The same workflow is available as
+atomic sources, shared dependency groups, direct packet derivation, and overlapping
+time windows for a shared sensor. If a sensor occurs in multiple packets, provide both
+inclusive nanosecond time bounds so non-overlap can be checked; missing bounds make that
+dependence unknown and strict fusion rejects it. Use dependency groups to declare other
+shared sources of dependence, such as common preprocessing or calibration. The local
+target packet remains unchanged; the result reports local, prototype, borrowed, and fused
+class distributions side by side. The CLI's `--allow-unknown-or-overlapping-lineage` option
+disables all lineage checks; use it only when independence has been established externally.
+The same workflow is available as
 `attitude-cohort-fusion --target ... --reference ... --prior-sharedness 0.8 --output ...`.
 
 Pydantic generates optional local exchange-schema files under the ignored
@@ -476,6 +539,9 @@ attitude-conventions trajectory.csv \
 
 The interval file includes canonical midpoint rates, observed and predicted delta
 quaternions, geodesic error vectors, path angles, and alias flags.
+For library callers, `best_interval_diagnostics(...)` returns rows typed as the
+exported `IntervalDiagnosticRow` `TypedDict`; `time_start_s` and `time_end_s` are
+optional and are included only when the input trajectory has timestamps.
 
 ## Ambiguity handling
 
@@ -490,6 +556,65 @@ The tool does not force a unique answer when the trajectory cannot identify one.
 - fixed, inferred, ambiguous, and not-applicable status per dimension.
 - `data_winning_class_ids` and `empirical_gap_to_next_class`, which distinguish
   multiple equal minima from a gap to the next distinct quotient class.
+
+### Check sensitivity to unknown rate-channel polarity
+
+The regular convention search includes a single global rate sign, not an
+independent sign for each raw rate column. For an explicit sensitivity check,
+pass a `TrajectoryData` containing both orientation and rate samples to
+`assess_rate_polarity_sensitivity`:
+
+```python
+from attitude_convention_inference import assess_rate_polarity_sensitivity
+
+sensitivity = assess_rate_polarity_sensitivity(trajectory)
+for profile in sensitivity.profiles:
+    print(
+        profile.polarity_by_input_axis,
+        profile.relative_log_risk_delta_vs_identity,
+        profile.within_best_fit_margin,
+    )
+```
+
+Each sign tuple is applied hypothetically to the three raw input rate columns
+before the convention search. The function runs eight complete searches, so it
+is intentionally opt-in. A non-identity pattern with a better fit is a reason
+to inspect sensor mapping and acquisition metadata, not an estimated
+calibration. Convention and sensor-polarity hypotheses can trade off; inspect
+all profiles within the best-fit margin and their winning classes. The helper
+does not change the input or the result of ordinary inference, and it does not
+auto-correct data. It does not detect or undo saturation, which is information
+loss. When sensor rails are known, use the following inspection helper to count
+observed rail hits; it cannot reconstruct clipped rate magnitudes.
+
+### Inspect samples at known rate rails
+
+If sensor metadata supplies per-column full-scale values, `inspect_rate_rails`
+counts samples at those lower and upper bounds and reports the longest
+consecutive run per rail. Pass the bounds and unit explicitly:
+
+```python
+from attitude_convention_inference import (
+    RateInputRailLimits,
+    RateUnit,
+    inspect_rate_rails,
+)
+
+rail_report = inspect_rate_rails(
+    trajectory,
+    RateInputRailLimits(
+        input_rate_unit=RateUnit.RADIANS_PER_SECOND,
+        lower_by_input_axis=(-0.3, -0.3, -0.3),
+        upper_by_input_axis=(0.3, 0.3, 0.3),
+        absolute_tolerance=1.0e-8,
+    ),
+)
+```
+
+The bounds, tolerance, and declared unit must match the raw rate columns; the
+helper performs no unit conversion. A hit is an observation at a supplied
+numeric rail, not proof of saturation—a real trajectory may reach the same
+value. It does not guess unknown limits or reconstruct lost rate magnitude.
 
 ## Numerical model
 
@@ -537,8 +662,10 @@ measurement, not a claim about statistical recovery or screening recall.
 Exact computational pruning is exposed separately through
 `should_prune_by_exact_lower_bound(lower_bound, incumbent_score)`: it returns true only
 for a verified strict lower-bound exceedance. This has different semantics from the
-statistical evidence contender set, which requires explicit bounded-loss/dependence
-assumptions.
+geometric-risk contender screen, which retains quotient classes inside a configured
+relative-fit margin rather than eliminating them by a bound. Both are separate from
+the sequential quasi-likelihood diagnostic below, whose dependence assumptions are
+explicitly limited.
 
 ## Statistical evidence and stopping
 
@@ -565,16 +692,38 @@ adjacent increments share attitude and rate samples, so an i.i.d. model is struc
 approximate. A genuine probabilistic claim would additionally require validated
 dependence assumptions, priors, and model calibration. Noticeable residual correlation
 is reported as a warning because the i.i.d. approximation can make evidence accumulate
-too quickly.
+too quickly. As a conservative safeguard, evidence is not marked sufficient when the
+absolute lag-one residual correlation is at least `0.95` and the estimated noise scale
+exceeds `residual_floor_rad`. This catches extreme persistent mismatch without treating
+near-zero numerical residuals as a measured noise process. It is not a general
+colored-noise model; the reported likelihood ratio remains a diagnostic, not a calibrated
+probability.
 
 For an explicit result that can abstain, inspect `report.decision`. It recommends a
 class only when the evidence threshold is met and exactly one data-only contender
 remains; soft priors cannot turn an ambiguous evidence set into a recommendation. The
 status and reason are typed as `InferenceDecisionStatus` and `InferenceDecisionReason`.
+The `evidence_contender_class_ids` name refers to a geometric-fit screen: classes are
+retained when the log ratio of their floor-adjusted `class_data_risk` to the minimum
+floor-adjusted class risk is at most `near_tie_delta_criterion` (default `2.0`, about a
+`7.39×` risk ratio; the floor is `residual_floor_rad**2`). This is a heuristic
+relative-fit margin, not a likelihood ratio or uncertainty interval, and it can vary
+with sampling cadence because its window sizes are specified in samples.
+`evidence_sufficient` is the separate sequential quasi-likelihood diagnostic described
+above.
 This evidence gate is separate from the heuristic `confidence` and `confidence_label`:
 the label can remain `indeterminate` even when `report.decision` recommends a sole
 contender. Neither is a calibrated probability; inspect them alongside evidence
 diagnostics and warnings.
+The numeric `confidence` is a bounded `[0, 1]` composite diagnostic heuristic based
+on fit, data support, motion/excitation, aliasing, integration behavior, and sample
+count, with conservative caps for unresolved or weak evidence. It is not the
+probability that the recommended class is correct, a posterior probability, or a
+likelihood ratio. `confidence_label` is only a score band: `high` at `>= 0.75`,
+`moderate` at `>= 0.50`, `low` at `>= 0.20`, otherwise `indeterminate`. The score
+does not gate `report.decision`; a recommendation and an `indeterminate` score label
+can coexist. The [fresh synthetic screen](docs/VALIDATION.md#fresh-seed-noisy-decision-screen-across-all-motion-profiles)
+contains examples of that separation, but cannot calibrate the score.
 The existing `operational_class_id` remains a deterministic best candidate for ranking
 and diagnostics, not a guarantee that the convention is established.
 
@@ -612,7 +761,8 @@ python scripts/ci.py
 Use `python scripts/ci.py --fix` to apply the autofixes before running the same
 checks. The runner handles mdrepo, rumdl, generated schemas and examples, Ruff,
 Pyright, scope markers, tests, and an alpha-tag public-contract audit in the CI
-order. A complete clone needs the `0.0.1.a0` tag for that final audit.
+order. The test stage records library statement and branch coverage and enforces
+an 85% combined floor. A complete clone needs the `0.0.1.a0` tag for the final audit.
 
 The reproducible adversarial harness can be run with:
 

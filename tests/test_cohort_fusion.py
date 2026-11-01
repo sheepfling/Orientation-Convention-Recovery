@@ -119,6 +119,122 @@ def test_overlap_and_dependency_groups_are_rejected() -> None:
 ####
 
 
+def test_shared_sensor_with_overlapping_time_windows_is_rejected() -> None:
+    target = packet("C", (1.4, 1.0, 0.8), "source-C").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-C",),
+                sensor_ids=("imu-7",),
+                time_start_ns=0,
+                time_end_ns=100,
+            )
+        }
+    )
+    reference = packet("A", (9.0, 1.0, 0.5), "source-A").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-A",),
+                sensor_ids=("imu-7",),
+                time_start_ns=100,
+                time_end_ns=200,
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="overlapping time windows"):
+        fuse_target_with_robust_borrowing(target, [reference], prior_sharedness=0.8)
+    ####
+####
+
+
+def test_shared_sensor_requires_time_bounds_under_strict_lineage() -> None:
+    target = packet("C", (1.4, 1.0, 0.8), "source-C").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-C",),
+                sensor_ids=("imu-7",),
+            )
+        }
+    )
+    reference = packet("A", (9.0, 1.0, 0.5), "source-A").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-A",),
+                sensor_ids=("imu-7",),
+            )
+        }
+    )
+
+    with pytest.raises(ValueError, match="lack complete time bounds"):
+        fuse_target_with_robust_borrowing(target, [reference], prior_sharedness=0.8)
+    ####
+####
+
+
+def test_unknown_sensor_overlap_can_only_be_overridden_explicitly() -> None:
+    target = packet("C", (1.4, 1.0, 0.8), "source-C").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-C",),
+                sensor_ids=("imu-7",),
+            )
+        }
+    )
+    reference = packet("A", (9.0, 1.0, 0.5), "source-A").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-A",),
+                sensor_ids=("imu-7",),
+            )
+        }
+    )
+
+    result = fuse_target_with_robust_borrowing(
+        target,
+        [reference],
+        prior_sharedness=0.8,
+        strict_lineage=False,
+    )
+
+    assert result.target_packet_id == "C"
+####
+
+
+def test_same_sensor_nonoverlapping_time_windows_can_be_fused() -> None:
+    target = packet("C", (1.4, 1.0, 0.8), "source-C").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-C",),
+                sensor_ids=("imu-7",),
+                time_start_ns=0,
+                time_end_ns=100,
+            )
+        }
+    )
+    reference = packet("A", (9.0, 1.0, 0.5), "source-A").model_copy(
+        update={
+            "lineage": LineageDescriptor(
+                atomic_source_ids=("source-A",),
+                sensor_ids=("imu-7",),
+                time_start_ns=101,
+                time_end_ns=200,
+            )
+        }
+    )
+
+    result = fuse_target_with_robust_borrowing(target, [reference], prior_sharedness=0.8)
+
+    assert result.target_packet_id == "C"
+####
+
+
+def test_lineage_time_bounds_must_be_provided_together() -> None:
+    with pytest.raises(ValueError, match="must be provided together"):
+        LineageDescriptor(time_start_ns=100)
+    ####
+####
+
+
 def test_uncalibrated_packet_returns_weight_only_status() -> None:
     result = fuse_target_with_robust_borrowing(
         packet("C", (1.4, 1.0, 0.8), "source-C", calibrated=False),
@@ -131,6 +247,53 @@ def test_uncalibrated_packet_returns_weight_only_status() -> None:
 ####
 
 
+@pytest.mark.parametrize("missing_field", ("calibration_id", "validation_domain"))
+def test_validated_calibration_requires_auditable_identity_and_domain(
+    missing_field: str,
+) -> None:
+    payload: dict[str, object] = {
+        "calibration_id": "cal-v1",
+        "validated": True,
+        "validation_domain": "held-out-sensors-v1",
+    }
+    del payload[missing_field]
+
+    with pytest.raises(ValueError, match=f"requires {missing_field}"):
+        CalibrationDescriptor.model_validate(payload)
+    ####
+####
+
+
+def test_packet_identifiers_must_be_nonempty() -> None:
+    with pytest.raises(ValueError, match="packet_id must be non-empty"):
+        packet("", (9.0, 1.0, 0.5), "source-A")
+    ####
+
+    with pytest.raises(ValueError, match="quotient_space_id must be non-empty"):
+        packet(
+            "A",
+            (9.0, 1.0, 0.5),
+            "source-A",
+            quotient_space_id="  ",
+        )
+    ####
+####
+
+
+def test_unsupported_packet_schema_version_is_rejected() -> None:
+    payload: dict[str, Any] = packet(
+        "A",
+        (9.0, 1.0, 0.5),
+        "source-A",
+    ).model_dump()
+    payload["schema_version"] = "2.0"
+
+    with pytest.raises(ValueError, match="unsupported EvidencePacket schema_version"):
+        EvidencePacket.model_validate(payload)
+    ####
+####
+
+
 def test_duplicate_packet_ids_are_rejected() -> None:
     duplicate = packet("A", (9.0, 1.0, 0.5), "source-A")
 
@@ -140,6 +303,16 @@ def test_duplicate_packet_ids_are_rejected() -> None:
             [duplicate],
             prior_sharedness=0.8,
         )
+    ####
+####
+
+
+def test_coalescence_rejects_duplicate_packet_ids_with_distinct_sources() -> None:
+    first = packet("same-id", (9.0, 1.0, 0.5), "source-A")
+    second = packet("same-id", (6.0, 1.0, 0.5), "source-B")
+
+    with pytest.raises(ValueError, match="packet IDs must be unique"):
+        coalesce_evidence_packets([first, second])
     ####
 ####
 
@@ -159,6 +332,10 @@ def test_invalid_power_and_sharedness_are_rejected() -> None:
     references = [packet("A", (9.0, 1.0, 0.5), "source-A")]
     with pytest.raises(ValueError, match="invalid power weight"):
         coalesce_evidence_packets(references, power_weights={"A": 1.5})
+    ####
+
+    with pytest.raises(ValueError, match="unknown packet IDs"):
+        coalesce_evidence_packets(references, power_weights={"unknown": 0.5})
     ####
 
     with pytest.raises(ValueError, match="prior_sharedness"):

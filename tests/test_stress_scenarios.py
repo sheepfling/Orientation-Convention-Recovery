@@ -11,6 +11,8 @@ from attitude_convention_inference import (
     AttitudeDirection,
     AttitudeRepresentation,
     InferenceConfig,
+    InferenceDecisionReason,
+    InferenceDecisionStatus,
     QuaternionOrder,
     RateFrame,
     RateUnit,
@@ -169,4 +171,8 @@ def test_stress_excitation_extremes_reduce_confidence(
         assert report.best.hypothesis.quaternion_order is expected_order
     ####
     assert report.diagnostics.confidence < 0.95
+    if expected_order is None:
+        assert report.decision.status is InferenceDecisionStatus.ABSTENTION
+        assert report.decision.reason is InferenceDecisionReason.EVIDENCE_INSUFFICIENT
+    ####
 ####

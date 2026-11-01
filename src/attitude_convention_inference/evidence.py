@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .core import TrajectoryData
 from .models import InferenceConfig
 from .scoring import ScoredCandidate as _ScoredCandidate
 from .scoring import score_hypothesis as _score_hypothesis
@@ -13,8 +12,11 @@ from .statistics import (
     estimate_noise_process,
     log_likelihood_advantage_from_squared_errors_by_prefix,
 )
+from .trajectory import TrajectoryData
 
-__all__ = ["_EvidenceSummary", "_evidence_summary"]
+__all__ = ["PERSISTENT_RESIDUAL_CORRELATION_LIMIT", "_EvidenceSummary", "_evidence_summary"]
+
+PERSISTENT_RESIDUAL_CORRELATION_LIMIT = 0.95
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +30,7 @@ class _EvidenceSummary:
     intervals_used: int
     fraction: float
     log_likelihood_ratio: float
+    dependence_limited: bool = False
 ####
 
 
@@ -111,6 +114,18 @@ def _evidence_summary(
             break
         ####
     ####
+    dependence_limited = (
+        abs(noise.lag1_autocorrelation) >= PERSISTENT_RESIDUAL_CORRELATION_LIMIT
+        and noise.sigma_rad > config.residual_floor_rad
+    )
+    if dependence_limited:
+        # A nearly persistent, measurable residual process invalidates the
+        # independent-increment scale used by this likelihood contrast. Tiny
+        # residuals below the configured numerical floor are excluded because
+        # their estimated autocorrelation is dominated by floating-point error.
+        sufficient = False
+        earliest = interval_count
+    ####
     fraction = float(earliest / interval_count) if interval_count else 1.0
     return _EvidenceSummary(
         noise.sigma_rad,
@@ -120,5 +135,6 @@ def _evidence_summary(
         earliest,
         fraction,
         final_delta,
+        dependence_limited,
     )
 ####

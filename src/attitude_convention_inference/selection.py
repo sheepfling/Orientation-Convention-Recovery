@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import isclose, log
 
-from .core import TrajectoryData
 from .hypotheses import DIMENSIONS as _DIMENSIONS
 from .models import InferenceConfig, ResultLabel
 from .ranking import _canonical_key, _hypothesis_value
 from .scoring import ScoredCandidate as _ScoredCandidate
+from .trajectory import TrajectoryData
 
 __all__ = ["_evidence_contender_classes", "_result_label", "_select_operational_result"]
 
@@ -50,7 +50,11 @@ def _evidence_contender_classes(
     ranked: tuple[_ScoredCandidate, ...],
     config: InferenceConfig,
 ) -> tuple[str, ...]:
-    """Return distinct quotient classes within the configured data-risk margin."""
+    """Return classes within the configured log-ratio of minimum floored geometric risk.
+
+    This descriptive fit margin is independent of the sequential likelihood
+    sufficiency check; it is not itself a likelihood-ratio or confidence threshold.
+    """
 
     representatives: dict[str, _ScoredCandidate] = {}
     for item in ranked:

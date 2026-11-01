@@ -25,9 +25,11 @@ from numpy import (
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
-from .core import FloatArray, TrajectoryData, integrate_interval_increments
+from .integration import integrate_interval_increments
+from .math_utils import FloatArray
 from .math_utils import rotation_from_euler as _rotation_from_euler
 from .math_utils import rotation_from_quat as _rotation_from_quat
+from .math_utils import rotation_product as _rotation_product
 from .math_utils import rotation_quaternions as _rotation_quaternions
 from .models import (
     AngleUnit,
@@ -39,6 +41,7 @@ from .models import (
     RateUnit,
     angle_unit_scale,
 )
+from .trajectory import TrajectoryData
 
 __all__ = [
     "SyntheticConvention",
@@ -92,7 +95,11 @@ def integrate_attitude_trajectory(
     )
     quaternions: list[NDArray[float64]] = [_rotation_quaternions(current)]
     for increment in increments:
-        current = current * increment if rate_frame is RateFrame.BODY else increment * current
+        current = (
+            _rotation_product(current, increment)
+            if rate_frame is RateFrame.BODY
+            else _rotation_product(increment, current)
+        )
         quaternions.append(_rotation_quaternions(current))
     ####
     return _rotation_from_quat(stack(quaternions))

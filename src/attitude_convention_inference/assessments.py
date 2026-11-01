@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from .hypotheses import DIMENSIONS as _DIMENSIONS
+from .hypotheses import DimensionName as _DimensionName
+from .hypotheses import SearchDimensionValue as _SearchDimensionValue
 from .hypotheses import hypothesis_count as _hypothesis_count
 from .hypotheses import relevant_dimensions as _relevant_dimensions
 from .hypotheses import search_values as _search_values
@@ -40,8 +42,8 @@ def _unresolved_dimensions(
 
 
 def _relative_prior_weights(
-    dimension: str,
-    allowed_values: tuple[object, ...],
+    dimension: _DimensionName,
+    allowed_values: tuple[_SearchDimensionValue, ...],
     config: InferenceConfig,
 ) -> dict[str, float]:
     configured = getattr(config.priors, dimension)
@@ -100,7 +102,7 @@ def _hypothesis_space_summary(
 
 def _dimension_values(
     candidates: tuple[_ScoredCandidate, ...],
-    dimension: str,
+    dimension: _DimensionName,
 ) -> tuple[str, ...]:
     values = {
         str(value)

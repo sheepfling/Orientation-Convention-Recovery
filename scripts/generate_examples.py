@@ -340,6 +340,8 @@ def _build_preference_profile() -> PreferenceProfile:
 
 
 def _write_synthetic_quaternion_csv(path: Path) -> None:
+    """Write the demo trajectory with portable 14-significant-digit values."""
+
     time_s = np.arange(0.0, 4.0, 0.025)
     rates = rich_three_axis_rates(time_s)
     convention = SyntheticConvention(
@@ -357,7 +359,16 @@ def _write_synthetic_quaternion_csv(path: Path) -> None:
         writer = csv.writer(stream, lineterminator="\n")
         writer.writerow(("time", "q0", "q1", "q2", "q3", "w0", "w1", "w2"))
         for index in range(data.sample_count):
-            writer.writerow((data.time_s[index], *data.orientation[index], *data.rates[index]))
+            writer.writerow(
+                tuple(
+                    format(float(value), ".14g")
+                    for value in (
+                        data.time_s[index],
+                        *data.orientation[index],
+                        *data.rates[index],
+                    )
+                )
+            )
         ####
     ####
 ####

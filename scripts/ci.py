@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from importlib.util import find_spec
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,11 +32,24 @@ def _run(command: list[str], label: str) -> None:
 ####
 
 
+def _require_python_module(module_name: str, package_name: str) -> None:
+    """Fail early with the dev-install command when a Python prerequisite is absent."""
+
+    if find_spec(module_name) is None:
+        raise SystemExit(
+            f"Required Python package is not installed: {package_name}. "
+            'Install development dependencies with `python -m pip install -e ".[dev]"`.'
+        )
+    ####
+####
+
+
 def _check_ruff_format(ruff: str, scope_markers: str) -> None:
-    """Check Ruff formatting on a temporary marker-free source tree."""
+    """Check that Ruff formatting plus scope-marker restoration is idempotent."""
 
     with tempfile.TemporaryDirectory(dir=ROOT) as temporary_directory:
         scratch = Path(temporary_directory)
+        python_files: list[Path] = []
         listed = subprocess.check_output(
             ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
             cwd=ROOT,
@@ -56,6 +70,7 @@ def _check_ruff_format(ruff: str, scope_markers: str) -> None:
             target = scratch / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
+            python_files.append(relative_path)
         ####
         paths = [str(scratch / directory) for directory in SCOPE_PATHS]
         _run(
@@ -63,14 +78,31 @@ def _check_ruff_format(ruff: str, scope_markers: str) -> None:
             "Strip markers in temporary copy",
         )
         _run(
-            [ruff, "format", "--check", "--config", str(ROOT / "pyproject.toml"), *paths],
-            "Ruff format",
+            [ruff, "format", "--quiet", "--config", str(ROOT / "pyproject.toml"), *paths],
+            "Ruff format in temporary copy",
         )
+        _run(
+            [scope_markers, "--fix", "--quiet", *paths],
+            "Restore markers in temporary copy",
+        )
+        changed_files = tuple(
+            relative_path
+            for relative_path in python_files
+            if (scratch / relative_path).read_bytes() != (ROOT / relative_path).read_bytes()
+        )
+        if changed_files:
+            changed_names = ", ".join(path.as_posix() for path in changed_files)
+            raise SystemExit(
+                "Python formatting or scope markers are not clean; run `python scripts/ci.py "
+                f"--fix`. Changed files: {changed_names}"
+            )
+        ####
     ####
 ####
 
 
 def run_pipeline(fix: bool) -> None:
+    _require_python_module("pytest_cov", "pytest-cov")
     mdrepo = _tool("mdrepo")
     _run([mdrepo, "fix" if fix else "check", "."], "mdrepo")
 
@@ -113,7 +145,19 @@ def run_pipeline(fix: bool) -> None:
         _run([scope_markers, *SCOPE_PATHS], "Scope markers")
     ####
 
-    _run([sys.executable, "-m", "pytest", "-q"], "Tests")
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
+            "--cov=attitude_convention_inference",
+            "--cov-branch",
+            "--cov-report=term-missing:skip-covered",
+            "--cov-fail-under=85",
+        ],
+        "Tests and branch coverage",
+    )
     _run(
         [sys.executable, str(ROOT / "scripts" / "check_contract_compatibility.py")],
         "Alpha public-contract compatibility",

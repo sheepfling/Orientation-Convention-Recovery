@@ -28,6 +28,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Typing :: Typed",
 ]
@@ -42,14 +44,17 @@ dev = [
     "mdrepo>=0.0.1.post0",
     "psutil>=7.0",
     "pytest>=8.3",
+    "pytest-cov>=6.0",
     "rumdl>=0.2.44",
     "ruff>=0.9",
     "pyright>=1.1.390",
-    "scope-markers @ git+https://github.com/sheepfling/scope-markers.git",
+    "scope-markers==0.0.1a0",
     "types-psutil>=7.0",
 ]
 publish = [
     "build>=1.2",
+    "setuptools>=77",
+    "setuptools-scm>=8",
     "twine>=6.0",
 ]
 

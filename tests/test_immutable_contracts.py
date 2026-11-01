@@ -25,6 +25,7 @@ from attitude_convention_inference import (
     TrajectoryData,
     infer_conventions,
 )
+from attitude_convention_inference.models import OverallDiagnostics
 from scripts.generate_validation_corpus import analytic_motion
 
 
@@ -139,5 +140,23 @@ def test_inference_report_freezes_nested_maps_and_round_trips() -> None:
     assert isinstance(
         report.best.heuristic_features.representation_feature_vector, MappingProxyType
     )
+    diagnostics_schema = report.diagnostics.model_json_schema()
+    confidence_schema = diagnostics_schema["properties"]["confidence"]
+    assert confidence_schema["minimum"] == 0.0
+    assert confidence_schema["maximum"] == 1.0
+    assert "not a probability of correctness" in confidence_schema["description"]
+    for invalid_confidence in (-0.01, 1.01, float("nan"), float("inf")):
+        invalid_payload = report.diagnostics.model_dump()
+        invalid_payload["confidence"] = invalid_confidence
+        with pytest.raises(ValueError):
+            OverallDiagnostics.model_validate(invalid_payload)
+        ####
+    ####
+    mismatched_label_payload = report.diagnostics.model_dump()
+    mismatched_label_payload["confidence"] = 0.1
+    mismatched_label_payload["confidence_label"] = "high"
+    with pytest.raises(ValueError, match="confidence_label must match"):
+        OverallDiagnostics.model_validate(mismatched_label_payload)
+    ####
     assert InferenceReport.model_validate(json.loads(report.model_dump_json())) == report
 ####

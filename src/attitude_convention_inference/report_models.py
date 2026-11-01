@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import field
-from typing import Literal
+from math import isclose, isfinite
+from typing import Annotated, Literal, TypeAlias, TypedDict
 
+from pydantic import Field
 from pydantic.dataclasses import dataclass
 
 from .decision import InferenceDecision
@@ -15,8 +17,10 @@ from .model_common import (
     ConfidenceLabel,
     DimensionStatus,
     FrozenModel,
+    RateUnit,
     ResultLabel,
     WrapUnitStatus,
+    confidence_label_for_score,
 )
 
 __all__ = [
@@ -25,10 +29,53 @@ __all__ = [
     "HeuristicFeatures",
     "HypothesisSpaceSummary",
     "InferenceReport",
+    "IntervalDiagnosticRow",
     "LagMetric",
     "OverallDiagnostics",
+    "RateInputChannelRailHits",
+    "RateInputRailLimits",
+    "RatePolarityProfileFit",
+    "RatePolaritySensitivityReport",
+    "RateRailInspectionReport",
     "ScaleRisk",
 ]
+
+RatePolarityByInputAxis: TypeAlias = tuple[Literal[-1, 1], Literal[-1, 1], Literal[-1, 1]]
+
+
+class _IntervalDiagnosticRequiredFields(TypedDict):
+    interval: int
+    dt_s: float
+    omega_x_rad_s: float
+    omega_y_rad_s: float
+    omega_z_rad_s: float
+    observed_delta_qx: float
+    observed_delta_qy: float
+    observed_delta_qz: float
+    observed_delta_qw: float
+    predicted_delta_qx: float
+    predicted_delta_qy: float
+    predicted_delta_qz: float
+    predicted_delta_qw: float
+    error_rotvec_x_rad: float
+    error_rotvec_y_rad: float
+    error_rotvec_z_rad: float
+    error_angle_rad: float
+    unwrapped_rate_angle_rad: float
+    near_alias: bool
+    hard_alias: bool
+####
+
+
+class IntervalDiagnosticRow(_IntervalDiagnosticRequiredFields, total=False):
+    """One adjacent-sample kinematic comparison, with angles in radians.
+
+    Timestamp fields are present only when the input trajectory includes times.
+    """
+
+    time_start_s: float
+    time_end_s: float
+####
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,9 +221,310 @@ class HypothesisSpaceSummary(FrozenModel):
 
 
 @dataclass(frozen=True, slots=True)
+class RatePolarityProfileFit(FrozenModel):
+    """Best convention fit after a hypothetical sign correction to raw rate columns."""
+
+    polarity_by_input_axis: Annotated[
+        RatePolarityByInputAxis,
+        Field(description="Hypothetical sign multiplier for the three raw rate input columns."),
+    ]
+    best_class_data_risk: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            allow_inf_nan=False,
+            description="Minimum class-level geometric risk after this hypothetical sign change.",
+        ),
+    ]
+    relative_log_risk_delta_from_best: Annotated[
+        float,
+        Field(
+            allow_inf_nan=False,
+            description=(
+                "Log of the floor-adjusted class data risk relative to the best sign profile; "
+                "not a likelihood ratio."
+            ),
+        ),
+    ]
+    relative_log_risk_delta_vs_identity: Annotated[
+        float,
+        Field(
+            allow_inf_nan=False,
+            description=(
+                "Log of the floor-adjusted class data risk relative to the identity sign profile; "
+                "negative values fit better."
+            ),
+        ),
+    ]
+    within_best_fit_margin: Annotated[
+        bool,
+        Field(description="Whether this profile is within the configured margin of the best fit."),
+    ]
+    normalized_rmse: Annotated[
+        float,
+        Field(ge=0.0, allow_inf_nan=False, description="Normalized RMSE of the best data fit."),
+    ]
+    data_winning_class_ids: Annotated[
+        tuple[str, ...],
+        Field(description="Convention classes with minimum geometric risk for this profile."),
+    ]
+    evidence_contender_class_ids: Annotated[
+        tuple[str, ...],
+        Field(description="Convention classes retained by the configured relative-fit screen."),
+    ]
+    decision: Annotated[
+        InferenceDecision,
+        Field(description="Decision for this hypothetical profile, not a sensor correction."),
+    ]
+    warnings: Annotated[
+        tuple[str, ...],
+        Field(description="Inference warnings for the hypothetical profile."),
+    ]
+####
+
+
+@dataclass(frozen=True, slots=True)
+class RatePolaritySensitivityReport(FrozenModel):
+    """Opt-in comparison of all per-input-axis rate sign patterns.
+
+    This is a sensitivity analysis, not a sensor calibration estimate. Several
+    sign patterns can fit equally well because rate polarity can trade off with
+    the convention hypotheses. The assessment never modifies input data or
+    recommends applying a correction.
+    """
+
+    sample_count: Annotated[int, Field(gt=0, description="Number of trajectory samples assessed.")]
+    near_tie_delta_criterion: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            allow_inf_nan=False,
+            description="Configured log-risk margin used to mark profiles near the best fit.",
+        ),
+    ]
+    identity_profile_data_risk: Annotated[
+        float,
+        Field(ge=0.0, allow_inf_nan=False, description="Best class data risk with no sign change."),
+    ]
+    best_profile_data_risk: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            allow_inf_nan=False,
+            description="Lowest class data risk across all eight profiles.",
+        ),
+    ]
+    profiles: Annotated[
+        tuple[RatePolarityProfileFit, ...],
+        Field(description="One fit assessment for every per-axis sign pattern."),
+    ]
+
+    def __post_init__(self) -> None:
+        expected_profiles = {
+            tuple(signs)
+            for signs in (
+                (-1, -1, -1),
+                (-1, -1, 1),
+                (-1, 1, -1),
+                (-1, 1, 1),
+                (1, -1, -1),
+                (1, -1, 1),
+                (1, 1, -1),
+                (1, 1, 1),
+            )
+        }
+        observed_profiles = {profile.polarity_by_input_axis for profile in self.profiles}
+        if len(self.profiles) != len(expected_profiles) or observed_profiles != expected_profiles:
+            raise ValueError(
+                "a rate-polarity sensitivity report must contain all eight sign patterns"
+            )
+        ####
+        identity_profile = next(
+            profile for profile in self.profiles if profile.polarity_by_input_axis == (1, 1, 1)
+        )
+        if identity_profile.best_class_data_risk != self.identity_profile_data_risk:
+            raise ValueError("identity_profile_data_risk must match the identity profile fit")
+        ####
+        if self.best_profile_data_risk != min(
+            profile.best_class_data_risk for profile in self.profiles
+        ):
+            raise ValueError("best_profile_data_risk must match the best profile fit")
+        ####
+    ####
+####
+
+
+@dataclass(frozen=True, slots=True)
+class RateInputRailLimits(FrozenModel):
+    """Caller-supplied lower/upper rail values for raw rate input columns.
+
+    Rail values and tolerance use ``input_rate_unit``; they are not converted
+    to canonical radians per second by this inspection contract.
+    """
+
+    input_rate_unit: Annotated[
+        RateUnit,
+        Field(description="Unit of the input samples and supplied lower/upper rail values."),
+    ]
+    lower_by_input_axis: Annotated[
+        tuple[float, float, float],
+        Field(description="Lower rail values for raw input columns 0, 1, and 2."),
+    ]
+    upper_by_input_axis: Annotated[
+        tuple[float, float, float],
+        Field(description="Upper rail values for raw input columns 0, 1, and 2."),
+    ]
+    absolute_tolerance: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            allow_inf_nan=False,
+            description="Absolute match tolerance in the declared input rate unit.",
+        ),
+    ] = 0.0
+
+    def __post_init__(self) -> None:
+        values = (*self.lower_by_input_axis, *self.upper_by_input_axis)
+        if not all(isfinite(value) for value in values):
+            raise ValueError("rate input rail values must be finite")
+        ####
+        for axis_index, (lower, upper) in enumerate(
+            zip(self.lower_by_input_axis, self.upper_by_input_axis, strict=True)
+        ):
+            if lower >= upper:
+                raise ValueError(f"input axis {axis_index} lower rail must be below its upper rail")
+            ####
+            if 2.0 * self.absolute_tolerance >= upper - lower:
+                raise ValueError(f"input axis {axis_index} rail tolerance regions must not overlap")
+            ####
+        ####
+    ####
+####
+
+
+@dataclass(frozen=True, slots=True)
+class RateInputChannelRailHits(FrozenModel):
+    """Observed sample counts at the declared rails for one raw rate column."""
+
+    input_axis_index: Annotated[
+        Literal[0, 1, 2], Field(description="Zero-based raw rate input column index.")
+    ]
+    lower_rail_value: Annotated[
+        float, Field(allow_inf_nan=False, description="Caller-declared lower rail in input units.")
+    ]
+    upper_rail_value: Annotated[
+        float, Field(allow_inf_nan=False, description="Caller-declared upper rail in input units.")
+    ]
+    lower_rail_hit_count: Annotated[
+        int, Field(ge=0, description="Samples within tolerance of the declared lower rail.")
+    ]
+    upper_rail_hit_count: Annotated[
+        int, Field(ge=0, description="Samples within tolerance of the declared upper rail.")
+    ]
+    lower_rail_hit_fraction: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            le=1.0,
+            allow_inf_nan=False,
+            description="Lower-hit count / sample count.",
+        ),
+    ]
+    upper_rail_hit_fraction: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            le=1.0,
+            allow_inf_nan=False,
+            description="Upper-hit count / sample count.",
+        ),
+    ]
+    longest_lower_rail_run: Annotated[
+        int, Field(ge=0, description="Longest consecutive run at the lower rail.")
+    ]
+    longest_upper_rail_run: Annotated[
+        int, Field(ge=0, description="Longest consecutive run at the upper rail.")
+    ]
+####
+
+
+@dataclass(frozen=True, slots=True)
+class RateRailInspectionReport(FrozenModel):
+    """Measured hits at caller-declared rate rails; not a clipping inference."""
+
+    sample_count: Annotated[int, Field(gt=0, description="Number of rate samples inspected.")]
+    rail_limits: Annotated[
+        RateInputRailLimits,
+        Field(description="Caller-supplied input rails and the unit/tolerance used for matching."),
+    ]
+    channels: Annotated[
+        tuple[RateInputChannelRailHits, ...],
+        Field(description="Rail-hit summaries in raw input-column order."),
+    ]
+
+    def __post_init__(self) -> None:
+        if tuple(channel.input_axis_index for channel in self.channels) != (0, 1, 2):
+            raise ValueError("rate rail report must contain input axes 0, 1, and 2 in order")
+        ####
+        for channel in self.channels:
+            if channel.lower_rail_hit_count + channel.upper_rail_hit_count > self.sample_count:
+                raise ValueError("lower and upper rail hit counts exceed the sample count")
+            ####
+            if (
+                channel.longest_lower_rail_run > channel.lower_rail_hit_count
+                or channel.longest_upper_rail_run > channel.upper_rail_hit_count
+            ):
+                raise ValueError("longest rail-hit run exceeds its rail-hit count")
+            ####
+            expected_lower_fraction = channel.lower_rail_hit_count / self.sample_count
+            expected_upper_fraction = channel.upper_rail_hit_count / self.sample_count
+            if not isclose(
+                channel.lower_rail_hit_fraction,
+                expected_lower_fraction,
+                rel_tol=1.0e-12,
+                abs_tol=1.0e-12,
+            ) or not isclose(
+                channel.upper_rail_hit_fraction,
+                expected_upper_fraction,
+                rel_tol=1.0e-12,
+                abs_tol=1.0e-12,
+            ):
+                raise ValueError("rail-hit fractions must match their counts and sample count")
+            ####
+        ####
+        expected_lower_rails = self.rail_limits.lower_by_input_axis
+        expected_upper_rails = self.rail_limits.upper_by_input_axis
+        if any(
+            channel.lower_rail_value != expected_lower_rails[channel.input_axis_index]
+            or channel.upper_rail_value != expected_upper_rails[channel.input_axis_index]
+            for channel in self.channels
+        ):
+            raise ValueError("channel rail values must match the supplied rail limits")
+        ####
+    ####
+####
+
+
+@dataclass(frozen=True, slots=True)
 class OverallDiagnostics(FrozenModel):
-    confidence: float
-    confidence_label: ConfidenceLabel
+    confidence: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            le=1.0,
+            allow_inf_nan=False,
+            description=(
+                "Uncalibrated composite heuristic score in [0, 1]; "
+                "not a probability of correctness."
+            ),
+        ),
+    ]
+    confidence_label: Annotated[
+        ConfidenceLabel,
+        Field(
+            description=("Deterministic band of the heuristic score, not a calibrated probability.")
+        ),
+    ]
     best_relative_support: float
     best_data_relative_support: float
     near_tie_count: int
@@ -211,6 +559,9 @@ class OverallDiagnostics(FrozenModel):
     raw_excitation_condition_ratio: float = 0.0
 
     def __post_init__(self) -> None:
+        if self.confidence_label is not confidence_label_for_score(self.confidence):
+            raise ValueError("confidence_label must match the heuristic confidence score band")
+        ####
         object.__setattr__(
             self, "unresolved_dimensions", freeze_mapping(self.unresolved_dimensions)
         )
@@ -251,6 +602,30 @@ class InferenceReport(FrozenModel):
     preference_profile_abstained: bool = False
     preference_profile_supported_class_ids: tuple[str, ...] = ()
     representative_selection_reason: str = "canonical-policy"
+    observation_model: Annotated[
+        Literal["aligned_samples", "sparse_orientation_anchors"],
+        Field(description="Sampling relationship between the orientation and rate observations."),
+    ] = "aligned_samples"
+    rate_sample_count: Annotated[
+        int | None,
+        Field(
+            ge=2,
+            description=(
+                "Number of dense rate samples for sparse-anchor input; null for aligned input."
+            ),
+        ),
+    ] = None
+
+    def __post_init__(self) -> None:
+        if self.observation_model == "aligned_samples" and self.rate_sample_count is not None:
+            raise ValueError("rate_sample_count is only set for sparse-orientation reports")
+        ####
+        if self.observation_model == "sparse_orientation_anchors" and (
+            self.rate_sample_count is None or self.rate_sample_count < 2
+        ):
+            raise ValueError("sparse-orientation reports require at least two rate samples")
+        ####
+    ####
 
     @property
     def decision(self) -> InferenceDecision:

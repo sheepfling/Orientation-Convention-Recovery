@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from .assessments import _hypothesis_space_summary
-from .core import TrajectoryData
-from .models import ConventionHypothesis, InferenceConfig, InferenceReport, OverallDiagnostics
+from .models import (
+    ConventionHypothesis,
+    InferenceConfig,
+    InferenceReport,
+    OverallDiagnostics,
+    ResultLabel,
+)
 from .scoring import ScoredCandidate as _ScoredCandidate
 from .selection import _evidence_contender_classes, _result_label, _select_operational_result
+from .trajectory import TrajectoryData
 
 __all__ = ["_build_inference_report"]
 
@@ -17,6 +25,9 @@ def _build_inference_report(
     ranked: tuple[_ScoredCandidate, ...],
     config: InferenceConfig,
     diagnostics: OverallDiagnostics,
+    *,
+    observation_model: Literal["aligned_samples", "sparse_orientation_anchors"] = "aligned_samples",
+    rate_sample_count: int | None = None,
 ) -> InferenceReport:
     rankings = tuple(item.result for item in ranked)
     hypothesis_space = _hypothesis_space_summary(data.representation, config)
@@ -36,12 +47,18 @@ def _build_inference_report(
     return InferenceReport(
         representation=data.representation,
         sample_count=data.sample_count,
+        observation_model=observation_model,
+        rate_sample_count=rate_sample_count,
         hypothesis_count=len(hypotheses),
         hypothesis_space=hypothesis_space,
         best=operational_item.result,
         rankings=rankings,
         diagnostics=diagnostics,
-        result_label=_result_label(data, config),
+        result_label=(
+            ResultLabel.TRAJECTORY_QUOTIENT
+            if observation_model == "sparse_orientation_anchors"
+            else _result_label(data, config)
+        ),
         evidence_contender_class_ids=contender_class_ids,
         data_winning_class_ids=data_winning_class_ids,
         empirical_gap_to_next_class=operational_item.result.empirical_gap_to_next_class,

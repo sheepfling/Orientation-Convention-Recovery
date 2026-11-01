@@ -15,6 +15,8 @@ from attitude_convention_inference import (
     ConventionPriors,
     DimensionStatus,
     InferenceConfig,
+    InferenceDecisionReason,
+    InferenceDecisionStatus,
     QuaternionOrder,
     RateFrame,
     SearchSpace,
@@ -142,6 +144,9 @@ def test_soft_prior_selects_tie_without_erasing_evidence_ambiguity() -> None:
     assert report.diagnostics.posterior_near_tie_count == 1
     assert report.diagnostics.unresolved_dimensions["rate_frame"] == ("body", "world")
     assert "rate_frame" not in report.diagnostics.posterior_unresolved_dimensions
+    assert report.decision.status is InferenceDecisionStatus.ABSTENTION
+    assert report.decision.reason is InferenceDecisionReason.EVIDENCE_INSUFFICIENT
+    assert len(report.decision.evidence_contender_class_ids) == 2
     assert (
         report.diagnostics.dimension_assessments["rate_frame"].status is DimensionStatus.AMBIGUOUS
     )

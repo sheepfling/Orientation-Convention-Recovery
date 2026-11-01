@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from itertools import product
+from typing import Literal, TypeAlias
 
 from .models import (
     AttitudeRepresentation,
@@ -20,7 +21,20 @@ __all__ = [
     "search_values",
 ]
 
-DIMENSIONS: tuple[str, ...] = (
+DimensionName: TypeAlias = Literal[
+    "attitude_direction",
+    "quaternion_order",
+    "euler_order",
+    "euler_mode",
+    "angle_unit",
+    "rate_frame",
+    "rate_order",
+    "rate_unit",
+    "rate_sign",
+]
+SearchDimensionValue: TypeAlias = str | int
+
+DIMENSIONS: tuple[DimensionName, ...] = (
     "attitude_direction",
     "quaternion_order",
     "euler_order",
@@ -31,7 +45,7 @@ DIMENSIONS: tuple[str, ...] = (
     "rate_unit",
     "rate_sign",
 )
-SEARCH_FIELD_BY_DIMENSION: dict[str, str] = {
+SEARCH_FIELD_BY_DIMENSION: dict[DimensionName, str] = {
     "attitude_direction": "attitude_directions",
     "quaternion_order": "quaternion_orders",
     "euler_order": "euler_orders",
@@ -44,7 +58,7 @@ SEARCH_FIELD_BY_DIMENSION: dict[str, str] = {
 }
 
 
-def relevant_dimensions(representation: AttitudeRepresentation) -> tuple[str, ...]:
+def relevant_dimensions(representation: AttitudeRepresentation) -> tuple[DimensionName, ...]:
     """Return the search dimensions applicable to an attitude representation."""
 
     attitude_dimensions = (
@@ -63,7 +77,10 @@ def relevant_dimensions(representation: AttitudeRepresentation) -> tuple[str, ..
 ####
 
 
-def search_values(search: SearchSpace, dimension: str) -> tuple[object, ...]:
+def search_values(
+    search: SearchSpace,
+    dimension: DimensionName,
+) -> tuple[SearchDimensionValue, ...]:
     """Return the configured values for one named search dimension."""
 
     return tuple(getattr(search, SEARCH_FIELD_BY_DIMENSION[dimension]))

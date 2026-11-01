@@ -276,6 +276,7 @@ class InferenceConfig(FrozenModel):
     window_sizes: tuple[int, ...] = (1, 2, 4, 8)
     trim_fraction: float = 0.02
     residual_floor_rad: float = 1.0e-5
+    # Natural-log ratio of floor-adjusted geometric risks, not a likelihood threshold.
     near_tie_delta_criterion: float = 2.0
     slow_step_threshold_rad: float = 0.002
     slow_total_motion_threshold_rad: float = 0.10

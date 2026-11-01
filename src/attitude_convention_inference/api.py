@@ -23,7 +23,6 @@ from .coercion import (
     coerce_priors,
     merge_priors,
 )
-from .core import TrajectoryData
 from .inference import infer_trajectory_conventions
 from .io import CsvLayout, detect_csv_layout, load_csv_trajectory
 from .models import (
@@ -31,11 +30,14 @@ from .models import (
     InferenceConfig,
     InferenceReport,
 )
+from .sparse_inference import infer_sparse_orientation_trajectory
+from .trajectory import SparseOrientationRateData, TrajectoryData
 
 __all__ = [
     "infer_attitude_conventions",
     "infer_conventions",
     "infer_csv",
+    "infer_sparse_orientation_conventions",
     "inspect_csv",
     "resolve_config",
 ]
@@ -99,6 +101,19 @@ def infer_conventions(
 
 @overload
 def infer_conventions(
+    orientation: SparseOrientationRateData,
+    rates: InferenceConfig | Mapping[str, Any] | None = None,
+    *,
+    config: ConfigInput = None,
+    constraints: ConstraintInput = None,
+    priors: PriorInput = None,
+    domain_prior: DomainPriorInput = None,
+    preference_profile: PreferenceProfileInput = None,
+) -> InferenceReport: ...
+
+
+@overload
+def infer_conventions(
     orientation: ArrayLike | None,
     rates: ArrayLike | None,
     *,
@@ -114,7 +129,7 @@ def infer_conventions(
 
 
 def infer_conventions(
-    orientation: TrajectoryData | ArrayLike | None,
+    orientation: TrajectoryData | SparseOrientationRateData | ArrayLike | None,
     rates: ArrayLike | InferenceConfig | Mapping[str, Any] | None = None,
     *,
     representation: AttitudeRepresentation | str | None = None,
@@ -133,9 +148,17 @@ def infer_conventions(
     soft priors may be dataclass models or plain mappings.
     """
 
-    if isinstance(orientation, TrajectoryData):
+    if isinstance(orientation, (TrajectoryData, SparseOrientationRateData)):
         if representation is not None or time_s is not None:
-            raise ValueError("representation and time_s must not be supplied with TrajectoryData.")
+            model_name = (
+                "SparseOrientationRateData"
+                if isinstance(orientation, SparseOrientationRateData)
+                else "TrajectoryData"
+            )
+            raise ValueError(f"representation and time_s must not be supplied with {model_name}.")
+        ####
+        if isinstance(orientation, SparseOrientationRateData) and sample_period_s is not None:
+            raise ValueError("sample_period_s must not be supplied with timestamped sparse data.")
         ####
         positional_config: ConfigInput = None
         if rates is not None:
@@ -159,6 +182,9 @@ def infer_conventions(
             preference_profile=preference_profile,
             sample_period_s=sample_period_s,
         )
+        if isinstance(data, SparseOrientationRateData):
+            return infer_sparse_orientation_trajectory(data, resolved)
+        ####
         return infer_trajectory_conventions(data, resolved)
     ####
 
@@ -184,6 +210,34 @@ def infer_conventions(
         sample_period_s=sample_period_s,
     )
     return infer_trajectory_conventions(data, resolved)
+####
+
+
+def infer_sparse_orientation_conventions(
+    data: SparseOrientationRateData,
+    config: ConfigInput = None,
+    *,
+    constraints: ConstraintInput = None,
+    priors: PriorInput = None,
+    domain_prior: DomainPriorInput = None,
+    preference_profile: PreferenceProfileInput = None,
+) -> InferenceReport:
+    """Infer conventions from sparse orientation anchors and timestamped dense rates.
+
+    Both streams must use the same clock. Rates are integrated over every anchor
+    interval, with linear interpolation at anchor times and no extrapolation.
+    Sequential evidence is based on alternating anchor intervals so adjacent
+    residuals do not reuse an orientation observation.
+    """
+
+    resolved = resolve_config(
+        config,
+        constraints=constraints,
+        priors=priors,
+        domain_prior=domain_prior,
+        preference_profile=preference_profile,
+    )
+    return infer_sparse_orientation_trajectory(data, resolved)
 ####
 
 

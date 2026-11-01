@@ -7,10 +7,10 @@ from math import log, sqrt
 
 from numpy import mean
 
-from .core import TrajectoryData
 from .models import CandidateResult, ConventionHypothesis, InferenceConfig, RateUnit
 from .scoring import ScoredCandidate as _ScoredCandidate
 from .scoring import replace_result as _replace_result
+from .trajectory import TrajectoryData
 
 __all__ = ["_annotate_exact_equivalences"]
 

@@ -11,9 +11,11 @@ from numpy import amax, amin, asarray, float64, intp, median
 from numpy import isfinite as np_isfinite
 from numpy.typing import NDArray
 
-from .core import FloatArray, TrajectoryData
 from .equivalence import _annotate_exact_equivalences
 from .hypotheses import DIMENSIONS as _DIMENSIONS
+from .hypotheses import DimensionName as _DimensionName
+from .hypotheses import SearchDimensionValue as _SearchDimensionValue
+from .math_utils import FloatArray
 from .math_utils import support_weights as _support_weights
 from .models import (
     AttitudeDirection,
@@ -25,11 +27,15 @@ from .models import (
 )
 from .scoring import ScoredCandidate as _ScoredCandidate
 from .scoring import replace_result as _replace_result
+from .trajectory import TrajectoryData
 
 __all__ = ["_assign_ranks_and_support", "_canonical_key", "_hypothesis_value"]
 
 
-def _hypothesis_value(hypothesis: ConventionHypothesis, dimension: str) -> object | None:
+def _hypothesis_value(
+    hypothesis: ConventionHypothesis,
+    dimension: _DimensionName,
+) -> _SearchDimensionValue | None:
     return getattr(hypothesis, dimension)
 ####
 

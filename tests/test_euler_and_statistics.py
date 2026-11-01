@@ -9,11 +9,13 @@ from numpy import square
 from numpy import sum as np_sum
 from scipy.spatial.transform import Rotation
 
+import attitude_convention_inference.integration as integration_module
 from attitude_convention_inference import (
     AngleUnit,
     AttitudeDirection,
     AttitudeRepresentation,
     ConventionConstraints,
+    ConventionHypothesis,
     EulerMode,
     InferenceConfig,
     QuaternionOrder,
@@ -25,7 +27,9 @@ from attitude_convention_inference import (
     WrapUnitStatus,
     infer_conventions,
 )
+from attitude_convention_inference import heuristics as heuristic_module
 from attitude_convention_inference.core import FloatArray
+from attitude_convention_inference.heuristics import EulerHeuristicDiagnostics
 from attitude_convention_inference.inference import estimate_noise_process
 from attitude_convention_inference.statistics import (
     fixed_noise_log_likelihood,
@@ -43,11 +47,6 @@ PROPER_EULER_CASES = tuple(product(PROPER_EULER_ORDERS, tuple(EulerMode)))
 REMAINING_TAIT_BRYAN_CASES = tuple(product(("xzy", "yxz", "yzx"), tuple(EulerMode)))
 
 
-def _from_euler(sequence: str, angles: FloatArray) -> Rotation:
-    return cast(Rotation, cast(Any, Rotation).from_euler(sequence, angles, degrees=False))
-####
-
-
 def _from_quat(quaternions: FloatArray) -> Rotation:
     return cast(Rotation, cast(Any, Rotation).from_quat(quaternions))
 ####
@@ -58,17 +57,15 @@ def _from_rotvec(rotvecs: FloatArray) -> Rotation:
 ####
 
 
-def _euler_values(rotation: Rotation, sequence: str) -> FloatArray:
-    return np.asarray(cast(Any, rotation).as_euler(sequence, degrees=False), dtype=np.float64)
-####
-
-
 def _quaternions(rotation: Rotation) -> FloatArray:
     return np.asarray(cast(Any, rotation).as_quat(), dtype=np.float64)
 ####
 
 
-def _euler_config(order: str) -> InferenceConfig:
+def _euler_config(
+    order: str,
+    rate_orders: tuple[str, ...] = ("pqr",),
+) -> InferenceConfig:
     return InferenceConfig(
         search_space=SearchSpace(
             attitude_directions=(AttitudeDirection.BODY_TO_WORLD,),
@@ -76,11 +73,187 @@ def _euler_config(order: str) -> InferenceConfig:
             euler_modes=tuple(EulerMode),
             angle_units=(AngleUnit.RADIANS,),
             rate_frames=(RateFrame.BODY,),
-            rate_orders=("pqr",),
+            rate_orders=rate_orders,
             rate_units=(RateUnit.RADIANS_PER_SECOND,),
             rate_signs=(1,),
         )
     )
+####
+
+
+@pytest.mark.parametrize("rates_available", (True, False))
+def test_inference_reuses_euler_heuristics_across_modes_and_rate_orders(
+    monkeypatch: pytest.MonkeyPatch,
+    rates_available: bool,
+) -> None:
+    time_s = np.arange(51, dtype=np.float64) * 0.025
+    truth = SyntheticConvention(
+        representation=AttitudeRepresentation.EULER,
+        attitude_direction=AttitudeDirection.BODY_TO_WORLD,
+        rate_frame=RateFrame.BODY,
+        rate_order="pqr",
+        euler_order="xyz",
+        euler_mode=EulerMode.EXTRINSIC,
+        angle_unit=AngleUnit.RADIANS,
+    )
+    data = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s, 0.6), truth)
+    if not rates_available:
+        data = TrajectoryData(
+            representation=AttitudeRepresentation.EULER,
+            orientation=data.orientation,
+            rates=None,
+            time_s=data.time_s,
+        )
+    ####
+    config = _euler_config("xyz", rate_orders=("pqr", "qpr"))
+    original = heuristic_module.euler_heuristic_diagnostics
+    calls = 0
+
+    def counted_diagnostics(
+        trajectory: TrajectoryData,
+        hypothesis: ConventionHypothesis,
+    ) -> EulerHeuristicDiagnostics:
+        nonlocal calls
+        calls += 1
+        return original(trajectory, hypothesis)
+    ####
+
+    monkeypatch.setattr(
+        heuristic_module,
+        "euler_heuristic_diagnostics",
+        counted_diagnostics,
+    )
+
+    report = infer_conventions(data, config)
+
+    assert report.hypothesis_count == 4
+    assert calls == 1
+####
+
+
+def test_euler_inference_reuses_rate_integrations_without_changing_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    time_s = np.arange(41, dtype=np.float64) * 0.025
+    truth = SyntheticConvention(
+        representation=AttitudeRepresentation.EULER,
+        attitude_direction=AttitudeDirection.BODY_TO_WORLD,
+        rate_frame=RateFrame.BODY,
+        rate_order="pqr",
+        euler_order="xyz",
+        euler_mode=EulerMode.EXTRINSIC,
+        angle_unit=AngleUnit.RADIANS,
+    )
+    data = encode_synthetic_trajectory(time_s, rich_three_axis_rates(time_s, 0.6), truth)
+    cache_type = integration_module.IntegratedIntervalsCache
+    original_method = cache_type.integrate
+    original_integrator = integration_module.integrate_interval_increments
+    calls = 0
+
+    def counted_integrator(
+        rates_rad_s: FloatArray,
+        durations_s: FloatArray,
+        frame: RateFrame,
+        substeps: int,
+    ) -> integration_module.IntegratedIntervals:
+        nonlocal calls
+        calls += 1
+        return original_integrator(rates_rad_s, durations_s, frame, substeps)
+    ####
+
+    def uncached_integration(
+        cache: integration_module.IntegratedIntervalsCache,
+        hypothesis: ConventionHypothesis,
+        rates_rad_s: FloatArray,
+        durations_s: FloatArray,
+        frame: RateFrame,
+        substeps: int,
+    ) -> integration_module.IntegratedIntervals:
+        del cache, hypothesis
+        return integration_module.integrate_interval_increments(
+            rates_rad_s,
+            durations_s,
+            frame,
+            substeps,
+        )
+    ####
+
+    monkeypatch.setattr(
+        integration_module,
+        "integrate_interval_increments",
+        counted_integrator,
+    )
+    monkeypatch.setattr(cache_type, "integrate", uncached_integration)
+    uncached_report = infer_conventions(data)
+    uncached_calls = calls
+
+    calls = 0
+    monkeypatch.setattr(cache_type, "integrate", original_method)
+    cached_report = infer_conventions(data)
+
+    assert cached_report.model_dump_json() == uncached_report.model_dump_json()
+    assert uncached_calls >= cached_report.hypothesis_count
+    assert calls * 10 < uncached_calls
+####
+
+
+def test_integrated_interval_cache_invalidates_changed_rates_and_durations() -> None:
+    time_s = np.arange(21, dtype=np.float64) * 0.05
+    rates = rich_three_axis_rates(time_s)
+    data = TrajectoryData(
+        representation=AttitudeRepresentation.QUATERNION,
+        orientation=np.tile(
+            np.asarray((0.0, 0.0, 0.0, 1.0), dtype=np.float64),
+            (time_s.size, 1),
+        ),
+        rates=rates,
+        time_s=time_s,
+    )
+    hypothesis = ConventionHypothesis(
+        attitude_direction=AttitudeDirection.BODY_TO_WORLD,
+        quaternion_order=QuaternionOrder.SCALAR_LAST,
+        rate_frame=RateFrame.BODY,
+        rate_order="pqr",
+        rate_unit=RateUnit.RADIANS_PER_SECOND,
+    )
+    rates_rad_s = rates.copy()
+    durations_s = np.diff(time_s)
+    cache = integration_module.IntegratedIntervalsCache(data)
+
+    first = cache.integrate(hypothesis, rates_rad_s, durations_s, RateFrame.BODY, 4)
+    rates_rad_s[1, 0] += 0.5
+    changed_rates = cache.integrate(hypothesis, rates_rad_s, durations_s, RateFrame.BODY, 4)
+    expected_after_rate_change = integration_module.integrate_interval_increments(
+        rates_rad_s,
+        durations_s,
+        RateFrame.BODY,
+        4,
+    )
+    np.testing.assert_allclose(
+        _quaternions(changed_rates.predicted_increments),
+        _quaternions(expected_after_rate_change.predicted_increments),
+    )
+    assert changed_rates is not first
+
+    durations_s[2] *= 2.0
+    changed_durations = cache.integrate(
+        hypothesis,
+        rates_rad_s,
+        durations_s,
+        RateFrame.BODY,
+        4,
+    )
+    expected_after_duration_change = integration_module.integrate_interval_increments(
+        rates_rad_s,
+        durations_s,
+        RateFrame.BODY,
+        4,
+    )
+    np.testing.assert_allclose(
+        _quaternions(changed_durations.predicted_increments),
+        _quaternions(expected_after_duration_change.predicted_increments),
+    )
+    assert changed_durations is not changed_rates
 ####
 
 
@@ -144,7 +317,7 @@ def test_proper_euler_gimbal_lock_uses_sine_singularity() -> None:
     )
     data = TrajectoryData(
         representation=AttitudeRepresentation.EULER,
-        orientation=_euler_values(_from_euler("XYX", angles), "XYX"),
+        orientation=angles,
         rates=np.zeros((21, 3)),
         time_s=np.arange(21, dtype=np.float64) * 0.1,
     )

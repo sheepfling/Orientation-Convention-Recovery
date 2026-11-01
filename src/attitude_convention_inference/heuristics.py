@@ -7,12 +7,13 @@ evidence and must not decide a convention on their own.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from numpy import (
     abs,
     amin,
     argmin,
+    asarray,
     cos,
     diff,
     float64,
@@ -33,8 +34,7 @@ from numpy import (
     sum as np_sum,
 )
 
-from .core import TrajectoryData
-from .math_utils import FloatArray
+from .math_utils import FloatArray, mean_float
 from .models import (
     AngleUnit,
     AttitudeRepresentation,
@@ -43,9 +43,11 @@ from .models import (
     WrapUnitStatus,
     angle_unit_scale,
 )
+from .trajectory import TrajectoryData
 
 __all__ = [
     "EulerHeuristicDiagnostics",
+    "EulerHeuristicDiagnosticsCache",
     "WrapUnitDiagnostics",
     "euler_heuristic_diagnostics",
     "gimbal_lock_fraction",
@@ -72,6 +74,49 @@ class EulerHeuristicDiagnostics:
     branch_switch_count: int
     singularity_margin: float | None
     branch_cost_rad2: float
+####
+
+
+@dataclass(frozen=True, slots=True)
+class _EulerHeuristicCacheKey:
+    """The Euler fields that determine representation-only path diagnostics."""
+
+    euler_order: str | None
+    angle_unit: AngleUnit | str | None
+####
+
+
+def _new_euler_heuristic_cache() -> dict[
+    _EulerHeuristicCacheKey,
+    EulerHeuristicDiagnostics,
+]:
+    return {}
+####
+
+
+@dataclass(slots=True)
+class EulerHeuristicDiagnosticsCache:
+    """Reuse Euler path diagnostics across rate and mode hypotheses for one stream."""
+
+    data: TrajectoryData
+    _values: dict[_EulerHeuristicCacheKey, EulerHeuristicDiagnostics] = field(
+        default_factory=_new_euler_heuristic_cache
+    )
+
+    def for_hypothesis(
+        self,
+        hypothesis: ConventionHypothesis,
+    ) -> EulerHeuristicDiagnostics:
+        """Get diagnostics keyed by Euler order/unit, computing them only once."""
+
+        key = _EulerHeuristicCacheKey(hypothesis.euler_order, hypothesis.angle_unit)
+        diagnostics = self._values.get(key)
+        if diagnostics is None:
+            diagnostics = euler_heuristic_diagnostics(self.data, hypothesis)
+            self._values[key] = diagnostics
+        ####
+        return diagnostics
+    ####
 ####
 
 
@@ -171,7 +216,9 @@ def euler_heuristic_diagnostics(
         maximum(middle_lower - angles[:, 1], angles[:, 1] - middle_upper),
         0.0,
     )
-    range_penalty = float(mean(np_sum(square(outer_violation), axis=1) + square(middle_violation)))
+    range_penalty = mean_float(
+        asarray(np_sum(square(outer_violation), axis=1) + square(middle_violation), dtype=float64)
+    )
 
     singular_measure = sin(angles[:, 1]) if not tait_bryan else cos(angles[:, 1])
     singularity_margin = float(amin(abs(singular_measure)))

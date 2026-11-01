@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import csv
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from numpy import asarray, float64
 
-from .core import TrajectoryData
 from .models import AttitudeRepresentation, InferenceConfig, InferenceReport
+from .trajectory import TrajectoryData
 
 __all__ = [
     "CsvLayout",
@@ -372,7 +372,7 @@ def write_report(path: str | Path, report: InferenceReport) -> None:
 
 def write_interval_diagnostics(
     path: str | Path,
-    rows: tuple[dict[str, float | int | bool], ...],
+    rows: Sequence[Mapping[str, object]],
 ) -> None:
     if not rows:
         raise ValueError("No interval diagnostics are available to write.")
@@ -381,6 +381,6 @@ def write_interval_diagnostics(
     with Path(path).open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(dict(row) for row in rows)
     ####
 ####

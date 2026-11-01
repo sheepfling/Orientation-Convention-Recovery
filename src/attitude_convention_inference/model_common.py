@@ -135,6 +135,22 @@ class ConfidenceLabel(StrEnum):
 ####
 
 
+def confidence_label_for_score(value: float) -> ConfidenceLabel:
+    """Map the uncalibrated diagnostic score to its deterministic display band."""
+
+    if value >= 0.75:
+        return ConfidenceLabel.HIGH
+    ####
+    if value >= 0.50:
+        return ConfidenceLabel.MODERATE
+    ####
+    if value >= 0.20:
+        return ConfidenceLabel.LOW
+    ####
+    return ConfidenceLabel.INDETERMINATE
+####
+
+
 class ResultLabel(StrEnum):
     TRAJECTORY_QUOTIENT = "trajectory-quotient"
     TRAJECTORY_CLASS = "trajectory-quotient"
