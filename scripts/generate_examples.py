@@ -14,6 +14,7 @@ from attitude_convention_inference import (
     AttitudeDirection,
     AttitudeRepresentation,
     CalibrationDescriptor,
+    CohortFusionResult,
     ConventionConstraints,
     ConventionPriors,
     EvidencePacket,
@@ -299,8 +300,26 @@ def _write_json(path: Path, payload: Any) -> None:
 ####
 
 
-def _write_model(path: Path, model: Any) -> None:
-    path.write_text(model.model_dump_json(indent=2) + "\n", encoding="utf-8")
+def _write_model(path: Path, model: EvidencePacket | CohortFusionResult) -> None:
+    payload = _portable_json_value(model.model_dump(mode="json"))
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+####
+
+
+def _portable_json_value(value: object) -> object:
+    """Normalize computed floats so generated examples are stable across platforms."""
+
+    if isinstance(value, float):
+        return float(format(value, ".14g"))
+    ####
+    if isinstance(value, dict):
+        items = cast(dict[str, object], value)
+        return {key: _portable_json_value(item) for key, item in items.items()}
+    ####
+    if isinstance(value, list):
+        return [_portable_json_value(item) for item in cast(list[object], value)]
+    ####
+    return value
 ####
 
 

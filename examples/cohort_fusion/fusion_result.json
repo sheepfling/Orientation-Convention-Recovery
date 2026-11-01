@@ -12,38 +12,38 @@
   ],
   "model_name": "robust-sharedness-mixture",
   "local_posterior": {
-    "C1": 0.43749999999999994,
-    "C2": 0.31249999999999994,
-    "C3": 0.25000000000000006
+    "C1": 0.4375,
+    "C2": 0.3125,
+    "C3": 0.25
   },
   "prototype_posterior": {
-    "C1": 0.9773755656108597,
-    "C2": 0.01809954751131223,
-    "C3": 0.0045248868778280564
+    "C1": 0.97737556561086,
+    "C2": 0.018099547511312,
+    "C3": 0.0045248868778281
   },
   "borrowed_prior": {
-    "C1": 0.8485671191553544,
-    "C2": 0.08114630467571643,
-    "C3": 0.0702865761689291
+    "C1": 0.84856711915535,
+    "C2": 0.081146304675716,
+    "C3": 0.070286576168929
   },
   "fused_posterior": {
-    "C1": 0.8963492352512746,
-    "C2": 0.06122541879096867,
-    "C3": 0.04242534595775674
+    "C1": 0.89634923525127,
+    "C2": 0.061225418790969,
+    "C3": 0.042425345957757
   },
   "fused_contender_set": [
     "C1"
   ],
   "prior_sharedness": 0.8,
-  "posterior_sharedness": 0.8390386016023307,
+  "posterior_sharedness": 0.83903860160233,
   "probability_valid": true,
   "status": "cohort-posterior",
   "explanation": {
     "winner_class": "C1",
     "runner_up_class": "C2",
-    "local_log_odds": 0.3364722366212129,
-    "borrowed_prior_log_odds": 2.347295428888018,
-    "fused_log_odds": 2.683767665509231
+    "local_log_odds": 0.33647223662121,
+    "borrowed_prior_log_odds": 2.347295428888,
+    "fused_log_odds": 2.6837676655092
   },
   "calibration_ids": [
     "orientation-risk-temp-v1"
